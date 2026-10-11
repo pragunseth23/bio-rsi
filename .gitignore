@@ -11,3 +11,6 @@ backend/data/
 contracts/artifacts/
 *.tsbuildinfo
 test-results/
+
+.vercel/
+.vercel

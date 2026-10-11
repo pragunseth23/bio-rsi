@@ -1,0 +1,13 @@
+.env
+.env.*
+.venv/
+.vercel/
+.git/
+.next/
+node_modules/
+backend/data/
+contracts/artifacts/
+__pycache__/
+.pytest_cache/
+test-results/
+*.tsbuildinfo
