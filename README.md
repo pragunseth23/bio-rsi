@@ -138,3 +138,12 @@ References: [RDKit Python documentation](https://www.rdkit.org/docs/GettingStart
 ## Interactive molecular scene
 
 The opening scene displays the current best molecule using deterministic RDKit ETKDG geometry (seed 42, with MMFF relaxation when supported). Drag to rotate. Geometry is an illustrative conformer, not a validated experimental structure; the optimization still uses the original descriptor scores. The renderer respects reduced-motion settings, pauses rendering offscreen, disposes GPU resources, and falls back to an RDKit SVG if WebGL or geometry is unavailable. `GET /api/molecule/scene?smiles=CCO` returns heavy-atom coordinates and connectivity.
+
+## Separate application pages
+
+- `/` — introduction and interactive molecular specimen.
+- `/optimization` — run configuration, molecular evolution and live progress.
+- `/history` — persisted runs and experiment records.
+- `/verification` — hash-chain and onchain checks.
+
+The root layout preserves one live API connection, configuration drafts, and the selected run across client-side navigation. Browser Back/Forward and direct page refresh work. Inspecting a record opens `/verification?experiment=<run-id>:<generation>`; these links restore the corresponding persisted run and record on refresh. Old `#lab/optimization`, `#lab/history`, and `#lab/verification` links redirect to their new pages.

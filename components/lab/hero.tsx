@@ -5,7 +5,7 @@ import { ArrowDownRight, ShieldCheck } from "lucide-react";
 import type { SceneInfo } from "@/components/molecular-scene";
 import { ELEMENT_COLORS } from "@/components/molecular-scene";
 import { useAnimatedNumber } from "@/hooks/use-motion";
-import type { Tab } from "@/hooks/use-hash-tab";
+import type { Tab } from "@/lib/navigation";
 import { fmt, objectiveLabel, pad } from "@/lib/format";
 import type { Candidate, Run } from "@/lib/types";
 

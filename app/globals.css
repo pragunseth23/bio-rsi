@@ -784,7 +784,7 @@ textarea {
 .tabs::-webkit-scrollbar {
   display: none;
 }
-.tabs [role="tab"] {
+.tabs a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -799,13 +799,13 @@ textarea {
   transition: color var(--dur-2) var(--ease-std);
   border-radius: var(--r-sm) var(--r-sm) 0 0;
 }
-.tabs [role="tab"]:hover {
+.tabs a:hover {
   color: var(--ink);
 }
-.tabs [role="tab"][aria-selected="true"] {
+.tabs a[aria-current="page"] {
   color: var(--ink);
 }
-.tabs [role="tab"][aria-selected="true"] svg {
+.tabs a[aria-current="page"] svg {
   color: var(--accent);
 }
 .tabs .count {
@@ -2358,13 +2358,13 @@ li[data-state="fail"] .check-icon {
 
 /* Mobile tabs share the width instead of scrolling out of view. */
 @media (max-width: 520px) {
-  .tabs [role="tab"] {
+  .tabs a {
     flex: 1 1 0;
     justify-content: center;
     padding: 0 6px;
     font-size: 14px;
   }
-  .tabs [role="tab"] svg {
+  .tabs a svg {
     display: none;
   }
   .tabs {
@@ -2545,7 +2545,7 @@ li[data-state="fail"] .check-icon {
 .theme-night .tabs-indicator {
   background: var(--accent-line);
 }
-.theme-night .tabs [role="tab"][aria-selected="true"] svg {
+.theme-night .tabs a[aria-current="page"] svg {
   color: var(--accent-line);
 }
 .theme-night .records th {
@@ -2664,4 +2664,33 @@ li[data-state="fail"] .check-icon {
     margin-left: 0;
     width: 100%;
   }
+}
+
+/* Each research view is a route; the shared layout retains the live run. */
+.console-page {
+  margin-top: 16px;
+}
+.console-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 3.8vw, 54px);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  max-width: 900px;
+  margin: 12px 0 20px;
+}
+.console-head h1 em {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+#main-content:focus {
+  outline: none;
+}
+#main-content > .banners:not(:empty) {
+  margin-top: 12px;
 }

@@ -1,13 +1,26 @@
 "use client";
 import { ArrowRight } from "lucide-react";
 import type { Connection } from "@/hooks/use-lab";
-import type { Tab } from "@/hooks/use-hash-tab";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { PAGE_PATHS, type Tab } from "@/lib/navigation";
 
 export function BrandMark() {
   return (
-    <svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true" className="brand-mark">
+    <svg
+      viewBox="0 0 32 32"
+      width="32"
+      height="32"
+      aria-hidden="true"
+      className="brand-mark"
+    >
       <circle cx="16" cy="16" r="16" fill="currentColor" />
-      <g stroke="var(--paper)" strokeWidth="1.6" fill="none" strokeLinecap="round">
+      <g
+        stroke="var(--paper)"
+        strokeWidth="1.6"
+        fill="none"
+        strokeLinecap="round"
+      >
         <path d="M10 20.5 16 11l6 9.5" />
         <path d="M10 20.5h12" opacity=".5" />
       </g>
@@ -27,38 +40,41 @@ const NAV: { tab: Tab; label: string }[] = [
 export function SiteHeader({
   chainMode,
   connection,
-  goTo,
 }: {
   chainMode?: string;
   connection: Connection;
-  goTo: (tab: Tab) => void;
 }) {
+  const pathname = usePathname();
   return (
     <header className="site-header">
-      <a className="brand" href="#top" aria-label="Proof of Discovery, back to top">
+      <Link className="brand" href="/" aria-label="Proof of Discovery home">
         <BrandMark />
         <span>
           Proof of
           <br />
           Discovery
         </span>
-      </a>
-      <nav className="site-nav" aria-label="Sections">
+      </Link>
+      <nav className="site-nav" aria-label="Main navigation">
+        <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
+          Home
+        </Link>
         {NAV.map((n) => (
-          <a
+          <Link
             key={n.tab}
-            href={`#lab/${n.tab}`}
-            onClick={(e) => {
-              e.preventDefault();
-              goTo(n.tab);
-            }}
+            href={PAGE_PATHS[n.tab]}
+            aria-current={pathname === PAGE_PATHS[n.tab] ? "page" : undefined}
           >
             {n.label}
-          </a>
+          </Link>
         ))}
       </nav>
       <div className="site-header-end">
-        <span className="mode-chip" data-connection={connection} title="Service status">
+        <span
+          className="mode-chip"
+          data-connection={connection}
+          title="Service status"
+        >
           <span className="badge-dot" aria-hidden="true" />
           {connection === "offline"
             ? "Service offline"
@@ -68,17 +84,10 @@ export function SiteHeader({
                 ? "Base Sepolia"
                 : "Local hash chain"}
         </span>
-        <a
-          className="btn btn-ink"
-          href="#lab/optimization"
-          onClick={(e) => {
-            e.preventDefault();
-            goTo("optimization");
-          }}
-        >
+        <Link className="btn btn-ink" href={PAGE_PATHS.optimization}>
           Enter the lab
           <ArrowRight size={16} aria-hidden="true" />
-        </a>
+        </Link>
       </div>
     </header>
   );

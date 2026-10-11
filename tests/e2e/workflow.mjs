@@ -92,10 +92,20 @@ await check("Hero renders a 3D model with element legend", async () => {
 // Scroll into the console via the header CTA
 await p.getByRole("link", { name: "Enter the lab" }).click();
 await p.waitForTimeout(900);
-await check("Enter the lab scrolls to console and sets #lab/optimization", async () => {
-  const top = await p.evaluate(() => document.getElementById("lab").getBoundingClientRect().top);
-  if (Math.abs(top) > 40) throw new Error(`console top ${top}`);
-  if (!p.url().endsWith("#lab/optimization")) throw new Error(p.url());
+await check("Enter the lab opens the dedicated optimization page", async () => {
+  await p.waitForURL("**/optimization");
+  await p.getByRole("heading", {name: /Set a direction/}).waitFor();
+  if (await p.locator(".hero").count()) throw new Error("Home hero rendered on optimization page");
+});
+await check("Draft survives navigation between pages", async () => {
+  await field("Iterations").fill("27");
+  await p.locator('.tabs a[data-tab="history"]').click();
+  await p.waitForURL("**/history");
+  if (await p.locator(".workbench").count()) throw new Error("Optimization rendered on history page");
+  await p.locator('.tabs a[data-tab="optimization"]').click();
+  await p.waitForURL("**/optimization");
+  if (await field("Iterations").inputValue() !== "27") throw new Error("Draft lost during navigation");
+  await field("Iterations").fill("30");
 });
 
 // Validation
@@ -198,7 +208,7 @@ await chipWatch;
 await check("Improvement chip appeared for a real fitness increase", async () => { if (!sawChip) throw new Error("not seen"); });
 await p.waitForTimeout(1000);
 await shot("06-completed", true);
-await p.evaluate(() => window.scrollTo(0, 0));
+await p.getByRole("link", {name: "Proof of Discovery home",exact:true}).click();
 await p.waitForTimeout(1200);
 await shot("06b-hero-after-run");
 await check("Hero readout reflects the run", async () => {
@@ -211,6 +221,7 @@ await check("3D reset view button works", async () => {
 });
 
 // Compare
+await p.getByRole("link", {name: "Enter the lab",exact:true}).click();
 await p.locator("#lab").scrollIntoViewIfNeeded();
 const compareBtn = p.getByRole("button", { name: /Compare generations/ });
 await compareBtn.click();
@@ -230,26 +241,26 @@ await check("Esc closes dialog and returns focus", async () => {
 });
 
 // Tabs, history and URL
-await p.getByRole("tab", { name: /History/ }).click();
-await check("History tab lists runs and records", async () => {
+await p.locator('.tabs a[data-tab="history"]').click();
+await check("History page lists runs and records", async () => {
   await p.waitForFunction(() => document.querySelectorAll(".records-panel tbody tr").length === 31, null, { timeout: 5000 });
   const runs = await p.locator(".run-list li").count();
   const rows = await p.locator(".records-panel tbody tr").count();
   if (runs !== 3 || rows !== 31) throw new Error(`runs ${runs} rows ${rows}`);
-  if (!p.url().endsWith("#lab/history")) throw new Error(p.url());
+  if (!p.url().endsWith("/history")) throw new Error(p.url());
   return `${runs} runs, ${rows} records`;
 });
 await shot("08-history");
-await check("Browser back/forward switch tabs", async () => {
+await check("Browser back/forward navigate between pages", async () => {
   await p.goBack();
-  await p.waitForFunction(() => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("Optimization"));
+  await p.waitForFunction(() => document.querySelector('.tabs a[aria-current="page"]')?.textContent?.includes("Optimization"));
   await p.goForward();
-  await p.waitForFunction(() => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("History"));
+  await p.waitForFunction(() => document.querySelector('.tabs a[aria-current="page"]')?.textContent?.includes("History"));
 });
-await check("Refresh keeps the History tab and run", async () => {
+await check("Refresh keeps the History page and run", async () => {
   await p.reload({ waitUntil: "networkidle" });
   await p.waitForTimeout(1500);
-  const sel = await p.locator('[role="tab"][aria-selected="true"]').innerText();
+  const sel = await p.locator('.tabs a[aria-current="page"]').innerText();
   if (!sel.includes("History")) throw new Error(sel);
   if (!/Completed/.test(await tabsEnd())) throw new Error(await tabsEnd());
 });
@@ -274,19 +285,20 @@ await check("Export JSON downloads a valid export", async () => {
 });
 
 // Keyboard: inspect a record → verification
-await check("Keyboard: arrow keys move between tabs", async () => {
-  await p.getByRole("tab", { name: /History/ }).focus();
-  await p.keyboard.press("ArrowRight");
-  const sel = await p.locator('[role="tab"][aria-selected="true"]').innerText();
-  if (!sel.includes("Verification")) throw new Error(sel);
-  await p.keyboard.press("ArrowLeft");
+await check("Keyboard: page links use normal Tab and Enter navigation", async () => {
+  await p.locator('.tabs a[data-tab="history"]').focus();
+  await p.keyboard.press("Tab");
+  await p.keyboard.press("Enter");
+  await p.waitForURL("**/verification");
+  await p.locator('.tabs a[data-tab="history"]').click();
+  await p.waitForURL("**/history");
 });
 await check("Keyboard: inspect button opens a record in Verification", async () => {
-  await p.getByRole("tab", { name: /History/ }).click();
+  await p.locator('.tabs a[data-tab="history"]').click();
   const btn = p.getByRole("button", { name: "Inspect generation 30" });
   await btn.focus();
   await p.keyboard.press("Enter");
-  await p.waitForFunction(() => document.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.includes("Verification"));
+  await p.waitForFunction(() => document.querySelector('.tabs a[aria-current="page"]')?.textContent?.includes("Verification"));
 });
 
 // Verify (real), copy, tamper
@@ -333,7 +345,7 @@ await check("Restored record verifies again", async () => {
 // Backend down at load → banner, disabled launch, automatic recovery
 expectErrors = true;
 await stopApi();
-await p.goto("http://127.0.0.1:3000/#lab/optimization"); await p.reload();
+await p.goto("http://127.0.0.1:3000/optimization"); await p.reload();
 await check("Load with service down: offline banner and launch disabled", async () => {
   await p.locator(".banner", { hasText: "unreachable" }).waitFor({ timeout: 10000 });
   if (!(await launchBtn().isDisabled())) throw new Error("launch enabled while offline");
@@ -397,7 +409,7 @@ await ctx.close();
 // Reduced motion
 const rctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
 const rp = await rctx.newPage();
-await rp.goto("http://127.0.0.1:3000/", { waitUntil: "networkidle" });
+await rp.goto("http://127.0.0.1:3000/optimization", { waitUntil: "networkidle" });
 await rp.waitForTimeout(1500);
 await check("Reduced motion: content visible immediately, no running animations", async () => {
   const op = await rp.evaluate(() => getComputedStyle(document.getElementById("lab")).opacity);
