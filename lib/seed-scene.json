@@ -1,0 +1,42 @@
+{
+  "smiles": "CCO",
+  "geometry": "illustrative-conformer",
+  "atoms": [
+    {
+      "element": "C",
+      "position": [
+        -0.88628,
+        0.1641,
+        -0.0728
+      ]
+    },
+    {
+      "element": "C",
+      "position": [
+        0.4727,
+        -0.50417,
+        -0.04838
+      ]
+    },
+    {
+      "element": "O",
+      "position": [
+        1.38528,
+        0.27943,
+        0.70665
+      ]
+    }
+  ],
+  "bonds": [
+    {
+      "start": 0,
+      "end": 1,
+      "order": 1.0
+    },
+    {
+      "start": 1,
+      "end": 2,
+      "order": 1.0
+    }
+  ]
+}

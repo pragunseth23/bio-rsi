@@ -1,4 +1,5 @@
 "use client";
+import { FRONTEND_ONLY } from "@/lib/hosting";
 import { modeName } from "@/lib/chain";
 import { ArrowRight } from "lucide-react";
 import type { Connection } from "@/hooks/use-lab";
@@ -77,11 +78,13 @@ export function SiteHeader({
           title="Service status"
         >
           <span className="badge-dot" aria-hidden="true" />
-          {connection === "offline"
-            ? "Service offline"
-            : connection === "connecting"
-              ? "Connecting"
-              : modeName(chainMode)}
+          {FRONTEND_ONLY
+            ? "Frontend preview"
+            : connection === "offline"
+              ? "Service offline"
+              : connection === "connecting"
+                ? "Connecting"
+                : modeName(chainMode)}
         </span>
         <Link className="btn btn-ink" href={PAGE_PATHS.optimization}>
           Enter the lab

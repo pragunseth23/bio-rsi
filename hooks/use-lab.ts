@@ -1,4 +1,5 @@
 "use client";
+import { FRONTEND_ONLY } from "@/lib/hosting";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, postJson, storage } from "@/lib/api";
 import type { Config, Experiment, Health, Run } from "@/lib/types";
@@ -90,6 +91,10 @@ export function useLab() {
 
   const connect: () => Promise<void> = useCallback(async () => {
     window.clearTimeout(timers.current.health);
+    if (FRONTEND_ONLY) {
+      setConnection("offline");
+      return;
+    }
     try {
       const [h, list] = await Promise.all([api<Health>("/api/health"), api<Run[]>("/api/runs")]);
       setHealth(h);

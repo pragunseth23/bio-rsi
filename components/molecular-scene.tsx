@@ -1,4 +1,6 @@
 "use client";
+import { FRONTEND_ONLY } from "@/lib/hosting";
+import seedScene from "@/lib/seed-scene.json";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -377,6 +379,14 @@ export function MolecularScene({
       onInfoRef.current?.({ smiles: data.smiles, geometry: data.geometry, atoms: data.atoms.length, elements });
       setState((s) => (s === "no-webgl" ? s : "ready"));
     };
+    if (FRONTEND_ONLY) {
+      if (smiles === seedScene.smiles) apply(seedScene as Geometry);
+      else {
+        onInfoRef.current?.(null);
+        setState((s) => (s === "no-webgl" ? s : "unavailable"));
+      }
+      return;
+    }
     const cached = cache.get(smiles);
     if (cached) {
       apply(cached);

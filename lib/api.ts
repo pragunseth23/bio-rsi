@@ -1,3 +1,4 @@
+import { FRONTEND_ONLY } from "./hosting";
 /** Thin client for the FastAPI service proxied at /api. */
 
 export class ApiError extends Error {
@@ -46,7 +47,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const postJson = <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+export const postJson = <T>(
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+) =>
   api<T>(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -55,12 +60,15 @@ export const postJson = <T>(path: string, body?: unknown, signal?: AbortSignal) 
   });
 
 export const svgUrl = (smiles: string) =>
-  `/api/molecule/svg?smiles=${encodeURIComponent(smiles)}`;
+  FRONTEND_ONLY && smiles === "CCO"
+    ? "/ethanol.svg"
+    : `/api/molecule/svg?smiles=${encodeURIComponent(smiles)}`;
 
 /** Download the run export in-page so failures are reported, not hidden in a popup. */
 export async function downloadExport(runId: string) {
   const response = await fetch(`/api/runs/${runId}/export`).catch(() => null);
-  if (!response?.ok) throw new Error("Export failed. The run could not be retrieved.");
+  if (!response?.ok)
+    throw new Error("Export failed. The run could not be retrieved.");
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

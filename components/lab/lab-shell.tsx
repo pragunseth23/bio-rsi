@@ -1,4 +1,5 @@
 "use client";
+import { FRONTEND_ONLY } from "@/lib/hosting";
 import { LoaderCircle, RefreshCw, WifiOff, X } from "lucide-react";
 import { SiteHeader, BrandMark } from "./site-header";
 import { CompareDialog } from "./compare-dialog";
@@ -33,7 +34,16 @@ export function LabShell({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           )}
-          {lab.connection === "offline" && (
+          {FRONTEND_ONLY && (
+            <div className="banner" data-tone="warn" role="status">
+              <p>
+                <strong>Frontend preview.</strong> Explore the interface and
+                molecular model. Optimization and verification will be available
+                when the research service is connected.
+              </p>
+            </div>
+          )}
+          {!FRONTEND_ONLY && lab.connection === "offline" && (
             <div className="banner" data-tone="bad" role="alert">
               <WifiOff size={16} aria-hidden="true" />
               <p>

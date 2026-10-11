@@ -182,3 +182,9 @@ The opening scene displays the current best molecule using deterministic RDKit E
 - `/verification` — hash-chain and onchain checks.
 
 The root layout preserves one live API connection, configuration drafts, and the selected run across client-side navigation. Browser Back/Forward and direct page refresh work. Inspecting a record opens `/verification?experiment=<run-id>:<generation>`; these links restore the corresponding persisted run and record on refresh. Old `#lab/optimization`, `#lab/history`, and `#lab/verification` links redirect to their new pages.
+
+## Vercel frontend deployment
+
+The frontend is deployed at https://bio-rsi.vercel.app. Set `NEXT_PUBLIC_FRONTEND_ONLY=true` for an interface preview without a research backend. This mode shows an explicit preview notice, keeps optimization disabled, stops API reconnect polling and displays a bundled RDKit-generated ethanol conformer. It generates no simulated runs or verification results.
+
+To enable the full app, host the Python service on a persistent host with a persistent database volume, set Vercel's `BACKEND_URL` to that service's HTTPS base URL, remove `NEXT_PUBLIC_FRONTEND_ONLY`, and redeploy (the proxy is configured at build time). The local `.env` and wallet key are excluded from deployments; configure backend secrets only on its host. Keep one backend worker and add authentication before exposing a funded commitment signer.

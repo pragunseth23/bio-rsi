@@ -1,4 +1,5 @@
 "use client";
+import { FRONTEND_ONLY } from "@/lib/hosting";
 import { useEffect, useState } from "react";
 import { ApiError, isNetworkError, postJson } from "@/lib/api";
 import { DEFAULT_CONFIG } from "@/lib/config";
@@ -29,7 +30,7 @@ export function useSeedPreview(draft: ConfigDraft, config: Config | undefined, e
   const key = JSON.stringify(body);
 
   useEffect(() => {
-    if (!enabled || !smiles || smiles.length > 500) {
+    if (FRONTEND_ONLY || !enabled || !smiles || smiles.length > 500) {
       setPreview({ state: "idle" });
       return;
     }
