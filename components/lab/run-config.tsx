@@ -135,7 +135,6 @@ export function RunConfig({
     <section className="panel config" aria-labelledby={`${uid}-title`}>
       <header className="panel-head">
         <h3 id={`${uid}-title`}>Run configuration</h3>
-        <span className="panel-index">01</span>
       </header>
       <form
         className="panel-body"
@@ -179,6 +178,10 @@ export function RunConfig({
           ))}
         </div>
 
+        <p className="field-hint preset-note">
+          Our tested demo: Ethanol with the default settings and seed 42 climbs from QED 0.407 to 0.946 in 30 generations.
+        </p>
+
         <Field id={`${uid}-objective`} label="Objective" hint={objective.hint}>
           <div className="select">
             <select
@@ -198,16 +201,18 @@ export function RunConfig({
           </div>
         </Field>
 
-        {draft.objective !== "qed" && (
-          <Field
-            id={`${uid}-target_logp`}
-            label="Target logP"
-            error={show("target_logp")}
-            hint={`${LIMITS.target_logp.min} to ${LIMITS.target_logp.max}`}
-          >
-            {numberInput("target_logp", 0.1)}
-          </Field>
-        )}
+        <Field
+          id={`${uid}-target_logp`}
+          label="Target logP"
+          error={show("target_logp")}
+          hint={
+            draft.objective === "qed"
+              ? "Not scored under QED, but the search switches to polar fragments when logP overshoots it by more than 1."
+              : `${LIMITS.target_logp.min} to ${LIMITS.target_logp.max}. Also steers the search toward polar fragments when overshot.`
+          }
+        >
+          {numberInput("target_logp", 0.1)}
+        </Field>
 
         {draft.objective === "multi" && (
           <fieldset className="weights" disabled={active}>

@@ -10,7 +10,9 @@ import type { Experiment, Verification } from "@/lib/types";
 
 type CheckRow = { label: string; detail: string; state: "pass" | "fail" | "skip" };
 
-function checksFor(v: Verification): CheckRow[] {
+// `v.status` is overwritten with "failed" by the server when integrity breaks, so the
+// commitment state is taken from the record's own proof status instead.
+function checksFor(v: Verification, proofStatus: string): CheckRow[] {
   return [
     {
       label: "Record hash recomputed",
@@ -33,9 +35,9 @@ function checksFor(v: Verification): CheckRow[] {
             ? "Contract storage does not match this record hash"
             : v.status === "unavailable"
               ? `RPC unavailable${v.error ? `: ${v.error}` : ""}`
-              : v.status === "local-only"
+              : proofStatus === "local-only"
                 ? "Not applicable in local-only mode"
-                : `Not checked (commitment ${v.status})`,
+                : `Not checked (commitment ${proofStatus})`,
       state: v.onchain_matches === true ? "pass" : v.onchain_matches === false ? "fail" : "skip",
     },
   ];
@@ -99,8 +101,24 @@ export function VerificationView({
     window.setTimeout(() => setCopied(null), 1800);
   }
 
-  const passed = verification && verification.hash_matches && verification.chain_valid && verification.status !== "failed";
-  const checks = verification ? checksFor(verification) : [];
+  // Integrity (hash + parent chain) and the onchain commitment are separate questions.
+  const intact = !!verification && verification.hash_matches && verification.chain_valid;
+  const verdict = !verification
+    ? null
+    : !intact
+      ? { tone: "bad", text: "Integrity check failed: this record or one of its ancestors no longer matches its hash." }
+      : verification.onchain_matches === true
+        ? { tone: "ok", text: "Verified: the record matches its Base Sepolia commitment." }
+        : verification.onchain_matches === false
+          ? { tone: "bad", text: "Mismatch: the local record is intact but differs from what was committed onchain." }
+          : current?.proof.status === "local-only"
+            ? { tone: "ok", text: "Local integrity verified. This run used local-only mode, so nothing was committed onchain." }
+            : current?.proof.status === "pending"
+              ? { tone: "warn", text: "Local integrity verified. The onchain commitment is still pending." }
+              : verification.status === "unavailable"
+                ? { tone: "warn", text: "Local integrity verified. The onchain check could not reach the RPC endpoint." }
+                : { tone: "warn", text: "Local integrity verified. The onchain commitment failed; retry it below." };
+  const checks = verification && current ? checksFor(verification, current.proof.status) : [];
 
   return (
     <div className="verification">
@@ -232,12 +250,8 @@ export function VerificationView({
                       </li>
                     ))}
                   </ol>
-                  <p className="verdict" data-pass={!!passed} data-shown={shown >= 3 || undefined} role="status">
-                    {passed
-                      ? verification.onchain_matches
-                        ? "Verified: record matches its onchain commitment."
-                        : "Verified: local integrity intact."
-                      : "Verification failed: this record or one of its ancestors does not match its hash."}
+                  <p className="verdict" data-tone={verdict!.tone} data-shown={shown >= 3 || undefined} role="status">
+                    {verdict!.text}
                   </p>
                 </>
               )}

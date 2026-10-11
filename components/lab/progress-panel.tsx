@@ -1,10 +1,11 @@
 "use client";
+import { memo } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAnimatedNumber, useReducedMotion } from "@/hooks/use-motion";
 import { fmt, pad, signed, statusLabel } from "@/lib/format";
 import type { Experiment, Run } from "@/lib/types";
 
-export function ProgressPanel({ run, experiments, objective }: { run: Run | null; experiments: Experiment[]; objective: string }) {
+export const ProgressPanel = memo(function ProgressPanel({ run, experiments, objective }: { run: Run | null; experiments: Experiment[]; objective: string }) {
   const reduced = useReducedMotion();
   const best = experiments.at(-1)?.record;
   const bestFitness = useAnimatedNumber(best?.fitness);
@@ -45,8 +46,8 @@ export function ProgressPanel({ run, experiments, objective }: { run: Run | null
             <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id="fitness-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.18} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="var(--accent-line)" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="var(--accent-line)" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="var(--rule)" strokeDasharray="2 6" vertical={false} />
@@ -83,7 +84,7 @@ export function ProgressPanel({ run, experiments, objective }: { run: Run | null
               <Area
                 dataKey="best"
                 type="stepAfter"
-                stroke="var(--accent)"
+                stroke="var(--accent-line)"
                 strokeWidth={2}
                 fill="url(#fitness-fill)"
                 name="Best"
@@ -142,6 +143,11 @@ export function ProgressPanel({ run, experiments, objective }: { run: Run | null
           </span>
         </div>
       </div>
+      {run && run.attempted > 0 && (
+        <p className="validity num">
+          {Math.round((run.evaluated / run.attempted) * 100)}% of attempted mutations gave a new valid molecule
+        </p>
+      )}
       <div
         className="progress-track"
         role="progressbar"
@@ -167,4 +173,4 @@ export function ProgressPanel({ run, experiments, objective }: { run: Run | null
       <p className="sr-only">{summary}</p>
     </section>
   );
-}
+});

@@ -128,12 +128,13 @@ def test_seed_evaluation_matches_run_initial(tmp_path, monkeypatch):
     with TestClient(main.app) as client:
         config = {"smiles": "Oc1ccccc1", "objective": "logp", "target_logp": 1.5, "iterations": 1}
         preview = client.post("/api/molecule/evaluate", json=config)
-        assert preview.status_code == 200
+        assert preview.status_code == 200 and preview.json()["valid"] is True
         run = client.post("/api/runs", json=config).json()
-        assert preview.json() == run["initial"]
-        invalid = client.post("/api/molecule/evaluate", json={"smiles": "C1CC"})
-        assert invalid.status_code == 422 and isinstance(invalid.json()["detail"], str)
-        assert client.post("/api/molecule/evaluate", json={"smiles": "CC.O"}).status_code == 422
+        assert preview.json()["candidate"] == run["initial"]
+        invalid = client.post("/api/molecule/evaluate", json={"smiles": "C1CC"}).json()
+        assert invalid["valid"] is False and isinstance(invalid["error"], str)
+        assert client.post("/api/molecule/evaluate", json={"smiles": "CC.O"}).json()["valid"] is False
+        assert client.post("/api/molecule/evaluate", json={"smiles": "CCO", "iterations": 0}).status_code == 422
 
 
 def test_illustrative_geometry_is_real_and_deterministic():

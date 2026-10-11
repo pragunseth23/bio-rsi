@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { ArrowRight, GitCompareArrows } from "lucide-react";
 import { Molecule } from "./molecule";
 import { PropertyGrid } from "./property-grid";
@@ -27,7 +27,7 @@ function useImprovement(runId: string | undefined, fitness: number | undefined) 
   return chip;
 }
 
-export function EvolutionPanel({
+export const EvolutionPanel = memo(function EvolutionPanel({
   run,
   seed,
   best,
@@ -139,4 +139,4 @@ export function EvolutionPanel({
       </footer>
     </section>
   );
-}
+});

@@ -1,18 +1,36 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { Molecule } from "./molecule";
 import { StatusBadge } from "./status";
-import { fmt, pad, shortHash } from "@/lib/format";
+import { fmt, pad, shortHash, signed } from "@/lib/format";
 import type { Experiment } from "@/lib/types";
 
+/** Property changes from the parent record (the previous generation's best). */
+function Change({ exp, parent }: { exp: Experiment; parent?: Experiment }) {
+  if (!parent) return <span className="muted">seed</span>;
+  if (parent.record.smiles === exp.record.smiles) return <span className="muted">unchanged elite</span>;
+  const p = exp.record.properties;
+  const q = parent.record.properties;
+  return (
+    <span className="change">
+      <b data-sign={Math.sign(exp.record.fitness - parent.record.fitness)}>{signed(exp.record.fitness - parent.record.fitness)}</b>
+      <small>
+        QED {signed(p.qed - q.qed, 2)} · logP {signed(p.logp - q.logp, 1)} · MW {signed(p.mw - q.mw, 0)}
+      </small>
+    </span>
+  );
+}
+
 /** Rows newer than the first render of this table get a brief highlight on arrival. */
-export function ExperimentTable({
+export const ExperimentTable = memo(function ExperimentTable({
+  all,
   experiments,
   onInspect,
   selectedHash,
   empty,
 }: {
+  all: Experiment[];
   experiments: Experiment[];
   onInspect: (e: Experiment) => void;
   selectedHash?: string;
@@ -25,6 +43,7 @@ export function ExperimentTable({
     seen.current = new Set(experiments.map((e) => e.hash));
   }, [experiments]);
 
+  const byIteration = new Map(all.map((e) => [e.record.iteration, e]));
   if (experiments.length === 0) return <div className="table-empty">{empty}</div>;
   return (
     <div className="table-wrap">
@@ -34,9 +53,10 @@ export function ExperimentTable({
             <th scope="col">Gen</th>
             <th scope="col">Best molecule</th>
             <th scope="col" className="num-col">Fitness</th>
-            <th scope="col" className="num-col hide-sm">Evaluated</th>
+            <th scope="col" className="hide-md">Change vs parent</th>
+            <th scope="col" className="num-col hide-lg">Scored</th>
             <th scope="col" className="hide-sm">Commitment</th>
-            <th scope="col" className="hide-md">Record hash</th>
+            <th scope="col" className="hide-lg">Parent → record</th>
             <th scope="col">
               <span className="sr-only">Inspect</span>
             </th>
@@ -58,7 +78,10 @@ export function ExperimentTable({
                 </div>
               </td>
               <td className="num num-col strong">{fmt(e.record.fitness)}</td>
-              <td className="num num-col hide-sm">
+              <td className="hide-md">
+                <Change exp={e} parent={byIteration.get(e.record.iteration - 1)} />
+              </td>
+              <td className="num num-col hide-lg">
                 {e.record.iteration === 0 ? (
                   <span className="muted">seed</span>
                 ) : (
@@ -83,8 +106,10 @@ export function ExperimentTable({
                   </a>
                 )}
               </td>
-              <td className="hide-md">
-                <code className="hash">{shortHash(e.hash)}</code>
+              <td className="hide-lg">
+                <code className="hash" title={`parent ${e.record.parent_hash}\nrecord ${e.hash}`}>
+                  {e.record.parent_hash.slice(0, 8)}… → {e.hash.slice(0, 8)}…
+                </code>
               </td>
               <td className="cell-action">
                 <button
@@ -104,4 +129,4 @@ export function ExperimentTable({
       </table>
     </div>
   );
-}
+});

@@ -36,8 +36,10 @@ export function useSeedPreview(draft: ConfigDraft, config: Config | undefined, e
     const controller = new AbortController();
     setPreview((p) => ({ state: "checking", last: p.state === "valid" ? p.candidate : p.state === "checking" ? p.last : undefined }));
     const timer = window.setTimeout(() => {
-      postJson<Candidate>("/api/molecule/evaluate", JSON.parse(key), controller.signal)
-        .then((candidate) => setPreview({ state: "valid", candidate }))
+      postJson<{ valid: boolean; candidate?: Candidate; error?: string }>("/api/molecule/evaluate", JSON.parse(key), controller.signal)
+        .then((r) =>
+          setPreview(r.valid && r.candidate ? { state: "valid", candidate: r.candidate } : { state: "invalid", message: r.error || "Invalid molecule" }),
+        )
         .catch((e) => {
           if ((e as Error).name === "AbortError") return;
           if (isNetworkError(e)) setPreview({ state: "unavailable" });

@@ -57,9 +57,7 @@ export function parseDraft(d: ConfigDraft): { config?: Config; errors: FieldErro
   const out: Record<string, number> = {};
   for (const key of ["iterations", "candidates", "target_logp", "seed"] as const) {
     const r = numberField(d[key], LIMITS[key]);
-    // The target field is hidden for QED; never block on a value the user cannot see.
-    if (r.error && key === "target_logp" && d.objective === "qed") out[key] = DEFAULT_CONFIG.target_logp;
-    else if (r.error) errors[key] = r.error;
+    if (r.error) errors[key] = r.error;
     else out[key] = r.value!;
   }
   const weights = {} as Record<WeightKey, number>;

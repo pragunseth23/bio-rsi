@@ -59,9 +59,21 @@ export function MolecularScene({
     api.current?.setRunning(running);
   }, [running]);
 
+  // WebGL setup is deferred to idle time so it never competes with first paint.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => setReady(true), { timeout: 1200 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(() => setReady(true), 300);
+    return () => window.clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     const element = host.current;
-    if (!element) return;
+    if (!element || !ready) return;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
@@ -69,7 +81,12 @@ export function MolecularScene({
       setState("no-webgl");
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    // Software rasterisers (no GPU) render at 1x to keep the main thread responsive.
+    const gl = renderer.getContext();
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const gpu = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+    const software = /swiftshader|llvmpipe|software/i.test(gpu);
+    renderer.setPixelRatio(software ? 1 : Math.min(window.devicePixelRatio, 1.75));
     renderer.setClearColor(0x000000, 0);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -145,45 +162,59 @@ export function MolecularScene({
       positions.forEach((p) => p.sub(center));
       radius = Math.max(1.2, ...positions.map((p) => p.length())) + 0.75;
       const group = new THREE.Group();
-      const sphere = new THREE.SphereGeometry(1, 48, 32);
-      data.atoms.forEach((atom, i) => {
-        const mesh = new THREE.Mesh(
-          sphere.clone(),
-          new THREE.MeshPhysicalMaterial({
-            color: ELEMENT_COLORS[atom.element] || "#aab3c5",
-            metalness: atom.element === "C" ? 0.85 : 0.35,
-            roughness: atom.element === "C" ? 0.2 : 0.28,
-            clearcoat: 1,
-            clearcoatRoughness: 0.1,
+      const material = (params: THREE.MeshPhysicalMaterialParameters) =>
+        software
+          ? new THREE.MeshStandardMaterial({ metalness: params.metalness, roughness: params.roughness, envMapIntensity: params.envMapIntensity })
+          : new THREE.MeshPhysicalMaterial({ clearcoat: 1, clearcoatRoughness: 0.1, ...params });
+      const matrix = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const one = new THREE.Vector3(1, 1, 1);
+
+      // Atoms: one instanced mesh per element (one draw call each).
+      const sphere = new THREE.SphereGeometry(1, software ? 24 : 40, software ? 16 : 28);
+      const byElement = new Map<string, number[]>();
+      data.atoms.forEach((atom, i) => byElement.set(atom.element, [...(byElement.get(atom.element) || []), i]));
+      byElement.forEach((indices, element) => {
+        const mesh = new THREE.InstancedMesh(
+          sphere,
+          material({
+            color: ELEMENT_COLORS[element] || "#aab3c5",
+            metalness: element === "C" ? 0.85 : 0.35,
+            roughness: element === "C" ? 0.2 : 0.28,
             envMapIntensity: 1.2,
           }),
+          indices.length,
         );
-        mesh.scale.setScalar(atom.element === "C" ? 0.6 : 0.66);
-        mesh.position.copy(positions[i]);
+        const r = element === "C" ? 0.6 : 0.66;
+        indices.forEach((atomIndex, k) => mesh.setMatrixAt(k, matrix.compose(positions[atomIndex], q.identity(), one.clone().setScalar(r))));
+        (mesh.material as THREE.MeshStandardMaterial).color.set(ELEMENT_COLORS[element] || "#aab3c5");
         group.add(mesh);
       });
-      sphere.dispose();
+
+      // Bonds: one instanced cylinder; double/triple bonds as thinner parallel rods.
       const up = new THREE.Vector3(0, 1, 0);
+      const rods: { mid: THREE.Vector3; dir: THREE.Vector3; length: number; width: number }[] = [];
       data.bonds.forEach((bond) => {
         const a = positions[bond.start];
         const b = positions[bond.end];
         const delta = new THREE.Vector3().subVectors(b, a);
-        const length = delta.length();
         const dir = delta.clone().normalize();
-        // Double/triple bonds drawn as parallel rods offset perpendicular to the bond.
         const count = bond.order >= 2.5 ? 3 : bond.order >= 1.75 ? 2 : 1;
         const side = new THREE.Vector3().crossVectors(dir, Math.abs(dir.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : up).normalize();
         for (let k = 0; k < count; k++) {
-          const offset = (k - (count - 1) / 2) * 0.22;
-          const rod = new THREE.Mesh(
-            new THREE.CylinderGeometry(count > 1 ? 0.08 : 0.13, count > 1 ? 0.08 : 0.13, length, 16),
-            new THREE.MeshPhysicalMaterial({ color: "#8d96b3", metalness: 0.8, roughness: 0.25, clearcoat: 1 }),
-          );
-          rod.position.copy(a).add(b).multiplyScalar(0.5).addScaledVector(side, offset);
-          rod.quaternion.setFromUnitVectors(up, dir);
-          group.add(rod);
+          const mid = a.clone().add(b).multiplyScalar(0.5).addScaledVector(side, (k - (count - 1) / 2) * 0.22);
+          rods.push({ mid, dir, length: delta.length(), width: count > 1 ? 0.08 : 0.13 });
         }
       });
+      if (rods.length) {
+        const cylinder = new THREE.CylinderGeometry(1, 1, 1, software ? 10 : 16);
+        const bonds = new THREE.InstancedMesh(cylinder, material({ color: "#8d96b3", metalness: 0.8, roughness: 0.25, envMapIntensity: 1 }), rods.length);
+        (bonds.material as THREE.MeshStandardMaterial).color.set("#8d96b3");
+        rods.forEach((rod, k) =>
+          bonds.setMatrixAt(k, matrix.compose(rod.mid, q.clone().setFromUnitVectors(up, rod.dir), new THREE.Vector3(rod.width, rod.length, rod.width))),
+        );
+        group.add(bonds);
+      }
       if (model) {
         spin.remove(model);
         disposeModel(model);
@@ -334,9 +365,10 @@ export function MolecularScene({
     };
     // The renderer lives for the component's lifetime; `running` is synced via api.setRunning.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ready]);
 
   useEffect(() => {
+    if (!ready && state !== "no-webgl") return;
     const controller = new AbortController();
     const apply = (data: Geometry) => {
       api.current?.load(data);
@@ -366,7 +398,8 @@ export function MolecularScene({
         setState((s) => (s === "no-webgl" ? s : "unavailable"));
       });
     return () => controller.abort();
-  }, [smiles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [smiles, ready]);
 
   const fallback = state === "no-webgl" || state === "unavailable";
   return (

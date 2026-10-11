@@ -1,8 +1,10 @@
 export const fmt = (n: number | undefined | null, digits = 3) =>
   n === undefined || n === null || Number.isNaN(n) ? "—" : n.toFixed(digits);
 
-export const signed = (n: number, digits = 3) =>
-  `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(digits)}`;
+export const signed = (n: number, digits = 3) => {
+  const rounded = Number(n.toFixed(digits));
+  return `${rounded > 0 ? "+" : rounded < 0 ? "−" : "±"}${Math.abs(rounded).toFixed(digits)}`;
+};
 
 export const shortHash = (s?: string) =>
   s ? `${s.slice(0, 10)}…${s.slice(-6)}` : "—";

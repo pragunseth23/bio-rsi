@@ -1,6 +1,6 @@
 "use client";
+import { memo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useState } from "react";
 import { ArrowDownRight, ShieldCheck } from "lucide-react";
 import type { SceneInfo } from "@/components/molecular-scene";
 import { ELEMENT_COLORS } from "@/components/molecular-scene";
@@ -14,14 +14,19 @@ const MolecularScene = dynamic(() => import("@/components/molecular-scene").then
   loading: () => <div className="scene" data-state="loading" />,
 });
 
-const WORDS = ["Discover.", "Evolve.", "Prove."];
+const shortObjective = (run: Run) =>
+  ({ qed: "QED", logp: `logP → ${run.config.target_logp}`, multi: "Multi" })[run.config.objective] || run.config.objective;
 
-export function Hero({
+const dateOf = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+export const Hero = memo(function Hero({
   run,
   best,
   seed,
   sceneSmiles,
   active,
+  lastEntry,
   goTo,
 }: {
   run: Run | null;
@@ -29,6 +34,7 @@ export function Hero({
   seed?: Candidate;
   sceneSmiles: string;
   active: boolean;
+  lastEntry?: Run;
   goTo: (tab: Tab) => void;
 }) {
   const [info, setInfo] = useState<SceneInfo | null>(null);
@@ -38,41 +44,53 @@ export function Hero({
 
   return (
     <section className="hero" aria-labelledby="hero-title" data-parallax-root>
-      <div className="hero-grid" aria-hidden="true" />
       <div className="hero-copy">
-        <p className="eyebrow eyebrow-dark">
-          <span>01</span> Autonomous molecular optimisation
-        </p>
+        <p className="kicker kicker-dark">A lab notebook for molecular search</p>
         <h1 id="hero-title" className="hero-title">
-          {WORDS.map((w, i) => (
-            <span key={w} className="word" style={{ "--i": i } as React.CSSProperties}>
-              <span>{w}</span>
+          <span className="line" style={{ "--i": 0 } as React.CSSProperties}>
+            <span>Evolve a molecule.</span>
+          </span>
+          <span className="line" style={{ "--i": 1 } as React.CSSProperties}>
+            <span>
+              <em>Keep the receipts.</em>
             </span>
-          ))}
+          </span>
         </h1>
         <p className="hero-lede">
-          Seed a molecule and choose an objective. An evolutionary search proposes, validates and scores
-          candidates with RDKit, keeps the five strongest, and seals every generation into a SHA-256 hash
-          chain you can verify.
+          Give it a starting molecule and a goal. A small evolutionary search mutates it, checks every candidate with
+          RDKit, keeps the five best, and writes each generation into a hash chain, so anyone can check later that the
+          record wasn’t edited.
         </p>
         <div className="hero-actions">
           <button type="button" className="btn btn-paper btn-lg" onClick={() => goTo("optimization")}>
-            Start an experiment
+            Open the bench
             <ArrowDownRight size={18} aria-hidden="true" />
           </button>
           <button type="button" className="btn btn-ghost-dark btn-lg" onClick={() => goTo("verification")}>
             <ShieldCheck size={17} aria-hidden="true" />
-            Verify a record
+            Check a record
           </button>
         </div>
-        <p className="hero-footnote">Scores are computational heuristics, not evidence of efficacy or safety.</p>
+        {lastEntry && (
+          <p className="notebook-note">
+            <span className="note-date">{dateOf(lastEntry.updated_at || lastEntry.created_at)}</span>
+            <span>
+              Last finished run: <code>{lastEntry.config.smiles}</code> went from {fmt(lastEntry.initial.fitness)} to{" "}
+              <strong>{fmt(lastEntry.best_fitness)}</strong> ({shortObjective(lastEntry)}) in {lastEntry.iteration} generations,{" "}
+              {lastEntry.evaluated.toLocaleString()} candidates scored.
+            </span>
+          </p>
+        )}
+        <p className="hero-footnote">
+          Scores are RDKit heuristics. They say nothing about whether a molecule works in a body, or is safe.
+        </p>
       </div>
 
       <div className="specimen">
         <div className="specimen-head">
           <span className="specimen-kicker">
             <span className={`live-dot ${active ? "is-live" : ""}`} aria-hidden="true" />
-            {active ? "Optimising" : specimenLabel}
+            {active ? "Optimising now" : specimenLabel}
           </span>
           <code className="specimen-smiles" title={info?.smiles || sceneSmiles}>
             {info?.smiles || sceneSmiles}
@@ -90,7 +108,7 @@ export function Hero({
                 </span>
               ))}
               <span className="specimen-note">
-                {info.geometry === "illustrative-conformer" ? "Illustrative conformer · ETKDG + MMFF" : "2D layout"}
+                {info.geometry === "illustrative-conformer" ? "Illustrative conformer (ETKDG + MMFF), drag to turn" : "2D layout"}
               </span>
             </>
           ) : (
@@ -116,15 +134,15 @@ export function Hero({
             </dd>
           </div>
           <div>
-            <dt>Evaluated</dt>
+            <dt>Scored</dt>
             <dd className="num">{evaluated === undefined ? "—" : Math.round(evaluated).toLocaleString()}</dd>
           </div>
           <div>
             <dt>Objective</dt>
-            <dd title={run ? objectiveLabel(run.config.objective) : undefined}>{run ? { qed: "QED", logp: `logP → ${run.config.target_logp}`, multi: "Multi" }[run.config.objective] || run.config.objective : "Not started"}</dd>
+            <dd title={run ? objectiveLabel(run.config.objective) : undefined}>{run ? shortObjective(run) : "Not started"}</dd>
           </div>
         </dl>
       </div>
     </section>
   );
-}
+});

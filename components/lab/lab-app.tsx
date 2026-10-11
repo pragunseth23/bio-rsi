@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, ArrowDownToLine, LoaderCircle, RefreshCw, WifiOff, X } from "lucide-react";
 import { AgentStrip } from "./agent-strip";
 import { CompareDialog } from "./compare-dialog";
@@ -22,9 +22,15 @@ import { DEFAULT_CONFIG, parseDraft, toDraft } from "@/lib/config";
 import { statusLabel } from "@/lib/format";
 import type { Candidate, ConfigDraft, Experiment } from "@/lib/types";
 
+const TRAIL_EMPTY = (
+  <p>Empty for now. Each generation’s best molecule gets written here with its hash as soon as a run starts.</p>
+);
+
 export function LabApp() {
   const lab = useLab();
   const [tab, setTab] = useHashTab();
+  // The tab bar responds instantly; the heavier panel renders right after without blocking input.
+  const panelTab = useDeferredValue(tab);
   const [draft, setDraftState] = useState<ConfigDraft>(() => toDraft(DEFAULT_CONFIG));
   const [touched, setTouched] = useState(false);
   const [selected, setSelected] = useState<Experiment | null>(null);
@@ -87,29 +93,36 @@ export function LabApp() {
     }
   }
 
-  function inspect(e: Experiment) {
-    setSelected(e);
-    setTab("verification");
-    document.getElementById("lab-tabs")?.scrollIntoView({ block: "nearest" });
-  }
+  const inspect = useCallback(
+    (e: Experiment) => {
+      setSelected(e);
+      setTab("verification");
+      document.getElementById("lab-tabs")?.scrollIntoView({ block: "nearest" });
+    },
+    [setTab],
+  );
 
-  function openCompare() {
+  const openCompare = useCallback(() => {
     if (experiments.length < 2) return;
     setPair([experiments[0].record.iteration, experiments.at(-1)!.record.iteration]);
     setCompareOpen(true);
-  }
+  }, [experiments]);
 
-  async function exportRun() {
+  const { setError } = lab;
+  const exportRun = useCallback(async () => {
     if (!run) return;
     setExporting(true);
     try {
       await downloadExport(run.id);
     } catch (e) {
-      lab.setError((e as Error).message);
+      setError((e as Error).message);
     } finally {
       setExporting(false);
     }
-  }
+  }, [run, setError]);
+
+  const recent = useMemo(() => experiments.slice(-5).reverse(), [experiments]);
+  const lastEntry = useMemo(() => lab.runs.find((r) => r.status === "completed"), [lab.runs]);
 
   // Close the compare dialog if the records behind it disappear (run switched).
   useEffect(() => {
@@ -130,16 +143,25 @@ export function LabApp() {
       </a>
       <SiteHeader chainMode={lab.health?.chain_mode} connection={lab.connection} goTo={goTo} />
       <main>
-        <Hero run={run} best={best} seed={run ? run.initial : previewSeed} sceneSmiles={sceneSmiles} active={active} goTo={goTo} />
+        <Hero
+          run={run}
+          best={best}
+          seed={run ? run.initial : previewSeed}
+          sceneSmiles={sceneSmiles}
+          active={active}
+          lastEntry={lastEntry}
+          goTo={goTo}
+        />
 
-        <div className="console reveal" id="lab" ref={consoleRef} tabIndex={-1} aria-labelledby="lab-title">
+        <div className="console theme-night reveal" id="lab" ref={consoleRef} tabIndex={-1} aria-labelledby="lab-title">
           <header className="console-head">
-            <p className="eyebrow">
-              <span>02</span> Research console
-            </p>
-            <h2 id="lab-title">Run an experiment.</h2>
+            <p className="kicker">The bench</p>
+            <h2 id="lab-title">
+              Set it up, let it run, <em>read the notebook.</em>
+            </h2>
             <p className="console-lede">
-              Configure a search, watch generations arrive live, then inspect, compare, export and verify any record.
+              Everything here talks to the live optimiser. Nothing is precomputed. Every number on this page comes from
+              RDKit or from the record chain.
             </p>
           </header>
 
@@ -196,8 +218,8 @@ export function LabApp() {
             {announcement}
           </p>
 
-          <div className="tab-panel" role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)} key={tab}>
-            {tab === "optimization" && (
+          <div className="tab-panel" role="tabpanel" id={panelId(panelTab)} aria-labelledby={tabId(panelTab)} key={panelTab}>
+            {panelTab === "optimization" && (
               <>
                 <div className="workbench">
                   <RunConfig
@@ -231,7 +253,7 @@ export function LabApp() {
                 <section className="trail" aria-labelledby="trail-title">
                   <header className="trail-head">
                     <div>
-                      <h3 id="trail-title">Experiment trail</h3>
+                      <h3 id="trail-title">Lab notebook</h3>
                       <span className="muted num">
                         {experiments.length} records ·{" "}
                         {experiments.filter((e) => e.proof.status === "verified").length} onchain
@@ -248,18 +270,15 @@ export function LabApp() {
                     </div>
                   </header>
                   <ExperimentTable
-                    experiments={experiments.slice(-5).reverse()}
+                    all={experiments}
+                    experiments={recent}
                     onInspect={inspect}
-                    empty={
-                      <p>
-                        Each generation’s best molecule is recorded here with its hash. Launch a run to begin the trail.
-                      </p>
-                    }
+                    empty={TRAIL_EMPTY}
                   />
                 </section>
               </>
             )}
-            {tab === "history" && (
+            {panelTab === "history" && (
               <HistoryView
                 runs={lab.runs}
                 run={run}
@@ -272,7 +291,7 @@ export function LabApp() {
                 loadingRun={loadingRun}
               />
             )}
-            {tab === "verification" && (
+            {panelTab === "verification" && (
               <VerificationView
                 experiments={experiments}
                 selected={selected ?? experiments.at(-1) ?? null}
@@ -288,7 +307,7 @@ export function LabApp() {
         <span className="footer-brand">
           <BrandMark /> Proof of Discovery
         </span>
-        <p>Computed properties are heuristics, not evidence of therapeutic efficacy or safety.</p>
+        <p>A hackathon build. Computed properties are heuristics, not evidence of efficacy or safety.</p>
         <span className="muted">{lab.health?.simulator || "RDKit"} · SHA-256</span>
       </footer>
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} experiments={experiments} pair={pair} setPair={setPair} />

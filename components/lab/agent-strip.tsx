@@ -1,6 +1,7 @@
+import { memo } from "react";
 import type { Experiment } from "@/lib/types";
 
-export function AgentStrip({ latest, agentMode }: { latest?: Experiment; agentMode?: string }) {
+export const AgentStrip = memo(function AgentStrip({ latest, agentMode }: { latest?: Experiment; agentMode?: string }) {
   const agent = latest?.record.agent;
   const source = agent?.source || agentMode || "heuristic";
   return (
@@ -24,4 +25,4 @@ export function AgentStrip({ latest, agentMode }: { latest?: Experiment; agentMo
       <span className="agent-cadence">Reviewed every 5 generations</span>
     </section>
   );
-}
+});

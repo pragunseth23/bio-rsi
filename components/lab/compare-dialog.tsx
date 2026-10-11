@@ -25,7 +25,7 @@ export function CompareDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog compare">
+        <Dialog.Content className="dialog compare theme-night">
           <header className="dialog-head">
             <div>
               <Dialog.Title>Compare generations</Dialog.Title>

@@ -257,11 +257,12 @@ async def verify(id: str):
 
 @app.post("/api/molecule/evaluate")
 async def evaluate_molecule(config: RunConfig):
-    """Score the seed exactly as POST /api/runs would, without starting a run."""
+    """Score the seed exactly as POST /api/runs would, without starting a run.
+    An unusable molecule is an expected answer here, so it returns 200 with valid=false."""
     try:
-        return await asyncio.to_thread(chemistry.evaluate, config.smiles, config.model_dump())
+        return {"valid": True, "candidate": await asyncio.to_thread(chemistry.evaluate, config.smiles, config.model_dump())}
     except ValueError as e:
-        raise HTTPException(422, str(e))
+        return {"valid": False, "error": str(e)}
 
 
 @app.get("/api/molecule/svg")

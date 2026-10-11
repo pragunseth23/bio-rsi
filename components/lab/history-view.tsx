@@ -65,10 +65,10 @@ export function HistoryView({
       <section className="panel records-panel" aria-labelledby="records-title">
         <header className="panel-head">
           <div>
-            <h3 id="records-title">Experiment records</h3>
+            <h3 id="records-title">Notebook entries</h3>
             {run && (
               <p className="panel-sub">
-                Run <code>{run.id.slice(0, 8)}</code> · seed <code>{run.config.smiles}</code> · seed {run.config.seed} ·{" "}
+                Run <code>{run.id.slice(0, 8)}</code> · start <code>{run.config.smiles}</code> · random seed {run.config.seed} ·{" "}
                 {run.config.iterations}×{run.config.candidates}
               </p>
             )}
@@ -89,6 +89,7 @@ export function HistoryView({
           parent hash is the previous record’s hash{experiments[0] ? `, starting from ${shortHash(experiments[0].record.parent_hash)}` : ""}.
         </p>
         <ExperimentTable
+          all={experiments}
           experiments={[...experiments].reverse()}
           onInspect={onInspect}
           empty={<p>Select a saved run, or launch one from the console.</p>}
