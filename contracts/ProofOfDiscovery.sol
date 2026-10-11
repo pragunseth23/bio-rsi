@@ -9,16 +9,20 @@ contract ProofOfDiscovery {
     mapping(bytes32 => bool) public exists;
     mapping(bytes32 => bytes32) public heads;
     mapping(bytes32 => uint256) public counts;
+    mapping(bytes32 => mapping(uint256 => bytes32)) public recordsByIteration;
+    uint256 public constant FITNESS_SCALE = 100000000;
     event ExperimentCommitted(bytes32 indexed runId, uint256 indexed iteration, bytes32 indexed recordHash, bytes32 candidateHash, int256 fitness, bytes32 parentHash);
     constructor() { owner = msg.sender; }
     function commit(bytes32 runId, uint256 iteration, bytes32 candidateHash, int256 fitness, bytes32 parentHash, bytes32 recordHash) external {
         require(msg.sender == owner, "Only owner");
+        require(runId != bytes32(0) && candidateHash != bytes32(0), "Zero identity");
         require(!exists[recordHash] && recordHash != bytes32(0), "Duplicate or zero record");
         require(iteration == counts[runId], "Out of order");
         require(parentHash == heads[runId], "Parent mismatch");
         experiments[recordHash] = Experiment(runId, iteration, candidateHash, fitness, parentHash);
         exists[recordHash] = true;
         heads[runId] = recordHash;
+        recordsByIteration[runId][iteration] = recordHash;
         counts[runId]++;
         emit ExperimentCommitted(runId, iteration, recordHash, candidateHash, fitness, parentHash);
     }

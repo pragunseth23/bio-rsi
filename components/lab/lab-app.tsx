@@ -33,7 +33,7 @@ const PAGE_COPY = {
     title: "Check the record.",
     subtitle: "Trace the lineage.",
     description:
-      "Recompute experiment hashes, check parent links, and compare committed records with Base Sepolia.",
+      "Recompute experiment hashes, check parent links, and compare committed records with the onchain registry.",
   },
 };
 const TRAIL_EMPTY = (

@@ -1,4 +1,5 @@
 "use client";
+import { modeName } from "@/lib/chain";
 import { ArrowRight } from "lucide-react";
 import type { Connection } from "@/hooks/use-lab";
 import Link from "next/link";
@@ -80,9 +81,7 @@ export function SiteHeader({
             ? "Service offline"
             : connection === "connecting"
               ? "Connecting"
-              : chainMode === "base-sepolia"
-                ? "Base Sepolia"
-                : "Local hash chain"}
+              : modeName(chainMode)}
         </span>
         <Link className="btn btn-ink" href={PAGE_PATHS.optimization}>
           Enter the lab

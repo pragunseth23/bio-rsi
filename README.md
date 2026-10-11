@@ -1,6 +1,6 @@
 # Proof of Discovery
 
-An immersive molecular lab with an interactive Three.js sculpture, a live research console, and a local, integrated demo of recursive molecular optimization with real RDKit scoring, a live Next.js dashboard, persisted experiments and a cryptographic audit trail. Solidity + viem can commit the same records to **Base Sepolia** when a funded account is configured.
+An immersive molecular lab with an interactive Three.js sculpture, a live research console, and a local, integrated demo of recursive molecular optimization with real RDKit scoring, a live Next.js dashboard, persisted experiments and a cryptographic audit trail. Solidity + viem can commit the same records to **BSC Testnet** (or opBNB Testnet / Base Sepolia) when a funded account is configured.
 
 ## Run locally
 
@@ -31,7 +31,7 @@ Production frontend: `npm run build && npm start`, with the Python service runni
 2. Launch optimization. RDKit validates and scores generated candidates; best fitness cannot decrease because elites survive each generation.
 3. Inspect molecular changes, best and average fitness, the agent's strategy, and the experiment trail (**Lab notebook**: change vs parent, parent → record hash, commitment status).
 4. Open **Verification**, select an experiment, and click **Verify experiment**.
-5. Compare two generations or export the complete run as JSON. Console tabs are linked in the URL (`#lab/history`, `#lab/verification`), so Back/Forward and refresh keep your place.
+5. Compare two generations or export the complete run as JSON. Console pages have dedicated URLs (`/history`, `/verification`), so Back/Forward and refresh keep your place.
 
 The seed preset is an actual starting point for stochastic search. No fitness trajectory is hardcoded. The search combines SELFIES token mutations, RDKit fragment attachment, atom replacement and terminal pruning. Up to 12 × batch size attempts per iteration limits stalled searches. Invalid molecules and canonical duplicates are excluded. The evaluated counter counts unique valid candidates actually scored, excluding the seed; attempts also count rejected mutations.
 
@@ -42,32 +42,60 @@ Objectives:
 - `logp`: `−abs(calculated_logP − target_logP)`, optimal value 0.
 - `multi`: configurable weighted mean of QED, normalized proximity to MW 300, target logP, TPSA 75, and rule-based structural constraints. Individual scores are in the exported records and API. Normalization equations are in `backend/chemistry.py`.
 
-## Base Sepolia
+## YZi Labs: trusted agent infrastructure × AI-native science
 
-Local-only mode is the default. It produces genuine SHA-256 hash-linked records and **never reports onchain success**. A transaction requires all three blockchain variables in `.env`:
+The [YZi Labs track](https://app.notion.com/p/B-BHacks-2-0-Tracks-Judges-3f243bcc211c80189a72e1f9b8583a67#3f243bcc211c809bbeb6e2714b96fb2b) is open to any chain; its setup guide recommends BSC Testnet or opBNB Testnet. This project addresses provenance for computational molecular discovery: a research agent's accepted generations become independently auditable, immutable commitments. The objective, descriptor values, mutation strategy, simulator version and timestamp are all bound by each record hash. This attests what the authorized agent recorded, not the truth of the chemistry.
+
+### Deploy and run on BSC Testnet
+
+Local-only mode works without a wallet and never reports onchain success. Copy `.env.example` to `.env`, configure a **testnet-only** private key, and fund its address using the [BNB faucet](https://www.bnbchain.org/en/testnet-faucet). Keep private keys out of chat, Git and the frontend.
 
 ```dotenv
-BASE_SEPOLIA_RPC_URL=https://your-base-sepolia-rpc
+CHAIN_NETWORK=bsc-testnet
+CHAIN_RPC_URL=https://bsc-testnet-dataseed.bnbchain.org
+CHAIN_CONFIRMATIONS=3
 WALLET_PRIVATE_KEY=0xYOUR_TESTNET_PRIVATE_KEY
-CONTRACT_ADDRESS=0xYOUR_DEPLOYED_CONTRACT
+CONTRACT_ADDRESS=
+CONTRACT_DEPLOYMENT_BLOCK=0
 ```
-
-Use a testnet-only wallet funded with Base Sepolia ETH. Set the RPC URL and private key first, then:
 
 ```bash
 npm run contract:compile
 npm run contract:deploy
 ```
 
-Copy the returned `contract_address` into `.env`, then restart both services. Deployment and commitments use **chain ID 84532**. The deployment wallet becomes the contract owner and must be the commitment signer. The contract enforces owner-only writes, unique record hashes, exact generation ordering starting at 0, and parent continuity within each run.
+Copy the returned `contract_address` and `deployment_block` into `.env` as `CONTRACT_ADDRESS` and `CONTRACT_DEPLOYMENT_BLOCK`. Then run `npm run chain:status` and restart the Python service. The status command checks RPC chain ID, exact compiled runtime bytecode, signer ownership and gas balance. Onchain launches repeat preflight and reject an invalid setup. Use **one** backend worker and a dedicated signer; do not send outside transactions from that wallet while it runs.
 
-The contract emits `ExperimentCommitted(runId, iteration, recordHash, candidateHash, fitness, parentHash)`. `runId` is Keccak-256 of the UUID string. Candidate and record commitments use SHA-256. Fitness is signed and scaled by `10^8`.
+Deployment persists signed transaction bytes before broadcast under ignored `contracts/artifacts/deployment-<chain>-<owner>.json`. If receipt polling times out, rerun the deploy command to reconcile the same transaction. It also saves a public deployment manifest. Keep these files until deployment is confirmed. A reverted deployment or a changed compiler/contract requires explicit inspection of that saved intent before creating another deployment; the tool does not silently redeploy.
 
-Simulation does not wait for transactions. A separate queue submits them sequentially and persists transaction hashes before waiting for receipts. A successful receipt produces the **Committed onchain** badge, block number and BaseScan link. **Verify experiment** additionally reads the stored contract tuple over RPC and compares every field. Only that read confirms the selected record matches contract state. One block confirmation is used for this testnet demo; it does not establish finality.
+| Network | Chain ID | RPC | Explorer |
+| --- | --- | --- | --- |
+| `bsc-testnet` (default) | 97 | `https://bsc-testnet-dataseed.bnbchain.org` | [BscScan](https://testnet.bscscan.com) |
+| `opbnb-testnet` | 5611 | `https://opbnb-testnet-rpc.bnbchain.org` | [opBNBScan](https://testnet.opbnbscan.com) |
+| `base-sepolia` | 84532 | Your Base Sepolia RPC | [BaseScan](https://sepolia.basescan.org) |
 
-RPC or transaction errors become `failed`, preserve any submitted transaction hash, and do not crash the optimizer. Use **Retry failed commitments** in the verification view to reconcile failed transactions in generation order. Unconfirmed transactions are checked again before any resubmission. If the RPC remains inaccessible, verification reports unavailable. Pending commitments reload from SQLite on restart. Interrupted optimization runs remain inspectable; start a new run to optimize again.
+Set both `CHAIN_NETWORK` and `CHAIN_RPC_URL` when changing networks. Mainnet is intentionally unsupported. Old runs retain their network and contract; verification refuses to use a mismatched RPC. Official network information: [BSC](https://docs.bnbchain.org/bnb-smart-chain/developers/json_rpc/json-rpc-endpoint/), [opBNB](https://docs.bnbchain.org/bnb-opbnb/get-started/network-info/).
 
-Never commit `.env`, private keys or production wallet credentials. The frontend receives no private keys. Without configured credentials and funds, onchain deployment/verification cannot be demonstrated.
+### Commitment and recovery guarantees
+
+The contract enforces immutable owner authorization, unique nonzero identities and record hashes, generation order from 0, and parent continuity per run. `recordsByIteration(runId, iteration)` gives a publicly queryable trail; `heads` and `counts` identify each run's latest commitment. Independent runs have independent histories.
+
+`ExperimentCommitted(runId, iteration, recordHash, candidateHash, fitness, parentHash)` binds the generation to its event and stored tuple. Run ID is Keccak-256 of the UUID; candidate and record hashes are SHA-256. Signed fitness is scaled by `10^8`, derived directly from the canonical eight-decimal string, including negative logP scores. The compiler targets Paris for compatibility with supported EVM testnets; use the locked npm dependencies to reproduce bytecode.
+
+Optimization continues independently of RPC delays. The single commitment worker prepares and signs a transaction, **atomically saves its bytes and computed hash in SQLite**, then broadcasts. A lost response or process restart cannot create a fresh transaction for that intent. Failed parents block descendants; unresolved signed transactions block allocating another nonce. Only a confirmed revert permits a new signed intent on retry. The backend retains signed bytes privately and omits them from API responses and exports.
+
+A **Committed onchain** badge requires a successful receipt, matching canonical block hash, matching contract event, all five stored fields, and the configured confirmations (default 3). Verification re-reads this evidence; confirmations are a testnet confirmation policy, not a guarantee of finality. RPC failures remain visible and never become success. Pending work resumes from SQLite; failed work is retried explicitly through **Retry failed commitments**. Changing the database, signing from another process, or editing transaction intent files breaks these recovery guarantees.
+
+### Judge verification without the app
+
+Export a committed run, then:
+
+```bash
+python3 scripts/verify_export.py discovery-export.json
+python3 scripts/verify_onchain.py discovery-export.json --contract 0xYOUR_TRUSTED_REGISTRY
+```
+
+Supply the registry address from your deployment manifest or another independently trusted source; do not derive the trust anchor solely from the export. The second command recomputes every record and ancestor link, checks the configured RPC network and exact contract bytecode, and compares contract storage and receipt events. It needs Node dependencies and a matching RPC configured in `.env`, **no wallet key and no application database**. The registry address and transaction links also appear on the Verification page. Without configured credentials and testnet funds, no public deployment is claimed.
 
 ## Optional LLM strategy
 
@@ -108,7 +136,7 @@ Interactive docs: http://127.0.0.1:8000/docs
 | `GET /api/molecule/svg?smiles=CCO` | RDKit-generated transparent SVG |
 | `POST /api/molecule/evaluate` | Score a seed exactly as a launch would, without starting a run; returns `{valid, candidate}` or `{valid: false, error}` |
 | `GET /api/molecule/scene?smiles=CCO` | Illustrative 3D conformer for the hero model |
-| `GET /api/health` | Engine version and configured modes |
+| `GET /api/health` | Engine version, configured network and onchain readiness/errors |
 
 Example:
 
@@ -129,7 +157,14 @@ npm run contract:compile
 npm run build
 ```
 
-Optional Solidity execution tests: install `.venv/bin/pip install -r backend/requirements-dev.txt`, then run the same pytest command. They deploy the compiled bytecode to an in-memory EVM and check emitted events, signed fitness, ownership, ordering, duplicate rejection and parent continuity. No testnet funds are used.
+Optional Solidity execution tests: install `.venv/bin/pip install -r backend/requirements-dev.txt`, then run the same pytest command. They deploy the compiled bytecode to an in-memory EVM and check emitted events, signed fitness, ownership, ordering, duplicate rejection and parent continuity. No testnet funds are used. The optional real viem integration test exercises signed outbox recovery after a lost broadcast response, restart/retry ordering, negative fitness, receipt mismatch, confirmation thresholds and wrong-network rejection:
+
+```bash
+# Terminal 1: local development EVM only (not public BSC)
+npm exec --yes --package ganache -- ganache --server.port 8545 --chain.chainId 97 --wallet.deterministic --logging.quiet
+# Terminal 2
+CHAIN_TEST_RPC=http://127.0.0.1:8545 .venv/bin/python -m pytest backend/tests/test_chain_integration.py -q
+```
 
 Tests cover three independently seeded 30-generation searches, ≥500 evaluated candidates, nondecreasing elite fitness, meaningful ethanol improvement, both additional objectives, invalid molecules, API launch/stop, persistence, exports and tamper detection.
 

@@ -40,7 +40,8 @@ export type ConfigDraft = {
   weights: Record<WeightKey, string>;
 };
 
-export type RunStatus = "running" | "completed" | "stopped" | "failed" | "interrupted";
+export type RunStatus =
+  "running" | "completed" | "stopped" | "failed" | "interrupted";
 
 export type Run = {
   id: string;
@@ -84,6 +85,10 @@ export type Experiment = {
     contract_address?: string;
     chain_id?: number | null;
     error?: string;
+    confirmations?: number;
+    confirmations_required?: number;
+    block_hash?: string;
+    signer?: string;
   };
 };
 
@@ -94,10 +99,17 @@ export type Verification = {
   canonical_json: string;
   status: string;
   onchain_matches: boolean | null;
+  onchain?: {
+    confirmations: number;
+    confirmations_required: number;
+    storage_matches: boolean;
+    event_matches: boolean;
+  };
   error?: string;
 };
 
 export type Health = {
+  chain?: { network: string; chain_id: number; ready: boolean; error?: string };
   status: string;
   chain_mode: string;
   agent: string;

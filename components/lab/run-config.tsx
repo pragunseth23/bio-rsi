@@ -1,14 +1,35 @@
 "use client";
+import { modeName } from "@/lib/chain";
 import { useId, useState } from "react";
-import { AlertCircle, Check, ChevronDown, LoaderCircle, Play, ShieldCheck, Square } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  ChevronDown,
+  LoaderCircle,
+  Play,
+  ShieldCheck,
+  Square,
+} from "lucide-react";
 import type { SeedPreview } from "@/hooks/use-seed-preview";
 import { LIMITS, PRESETS, WEIGHT_KEYS, type FieldErrors } from "@/lib/config";
 import type { ConfigDraft, Objective } from "@/lib/types";
 
 const OBJECTIVES: { value: Objective; label: string; hint: string }[] = [
-  { value: "qed", label: "Maximize drug-likeness (QED)", hint: "Fitness is RDKit QED, 0–1. Higher is better." },
-  { value: "logp", label: "Target lipophilicity (logP)", hint: "Fitness = −|calculated logP − target|. Best is 0." },
-  { value: "multi", label: "Balanced multi-objective", hint: "Weighted mean of QED, logP, MW, TPSA and rule-based constraints." },
+  {
+    value: "qed",
+    label: "Maximize drug-likeness (QED)",
+    hint: "Fitness is RDKit QED, 0–1. Higher is better.",
+  },
+  {
+    value: "logp",
+    label: "Target lipophilicity (logP)",
+    hint: "Fitness = −|calculated logP − target|. Best is 0.",
+  },
+  {
+    value: "multi",
+    label: "Balanced multi-objective",
+    hint: "Weighted mean of QED, logP, MW, TPSA and rule-based constraints.",
+  },
 ];
 
 const WEIGHT_LABELS: Record<string, string> = {
@@ -85,7 +106,8 @@ export function RunConfig({
 }) {
   const uid = useId();
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const set = <K extends keyof ConfigDraft>(key: K, value: ConfigDraft[K]) => setDraft({ ...draft, [key]: value });
+  const set = <K extends keyof ConfigDraft>(key: K, value: ConfigDraft[K]) =>
+    setDraft({ ...draft, [key]: value });
   const show = (k: keyof FieldErrors) => (touched ? errors[k] : undefined);
   const iterations = Number(draft.iterations);
   const candidates = Number(draft.candidates);
@@ -93,7 +115,11 @@ export function RunConfig({
   const objective = OBJECTIVES.find((o) => o.value === draft.objective)!;
 
   const smilesError =
-    errors.smiles && (touched || draft.smiles.length > 0) ? errors.smiles : preview.state === "invalid" ? preview.message : undefined;
+    errors.smiles && (touched || draft.smiles.length > 0)
+      ? errors.smiles
+      : preview.state === "invalid"
+        ? preview.message
+        : undefined;
 
   const seedStatus =
     preview.state === "checking" ? (
@@ -102,7 +128,8 @@ export function RunConfig({
       </span>
     ) : preview.state === "valid" ? (
       <span className="seed-status" data-state="valid">
-        <Check size={12} aria-hidden="true" /> Valid · {preview.candidate.properties.heavy_atoms} atoms
+        <Check size={12} aria-hidden="true" /> Valid ·{" "}
+        {preview.candidate.properties.heavy_atoms} atoms
       </span>
     ) : preview.state === "unavailable" ? (
       <span className="seed-status" data-state="unavailable">
@@ -112,7 +139,10 @@ export function RunConfig({
       <span className="seed-status">SMILES</span>
     );
 
-  const numberInput = (key: "iterations" | "candidates" | "seed" | "target_logp", step = 1) => {
+  const numberInput = (
+    key: "iterations" | "candidates" | "seed" | "target_logp",
+    step = 1,
+  ) => {
     const id = `${uid}-${key}`;
     return (
       <input
@@ -144,7 +174,12 @@ export function RunConfig({
         }}
         noValidate
       >
-        <Field id={`${uid}-smiles`} label="Starting molecule" error={smilesError} aside={seedStatus}>
+        <Field
+          id={`${uid}-smiles`}
+          label="Starting molecule"
+          error={smilesError}
+          aside={seedStatus}
+        >
           <textarea
             id={`${uid}-smiles`}
             value={draft.smiles}
@@ -179,7 +214,8 @@ export function RunConfig({
         </div>
 
         <p className="field-hint preset-note">
-          Our tested demo: Ethanol with the default settings and seed 42 climbs from QED 0.407 to 0.946 in 30 generations.
+          Our tested demo: Ethanol with the default settings and seed 42 climbs
+          from QED 0.407 to 0.946 in 30 generations.
         </p>
 
         <Field id={`${uid}-objective`} label="Objective" hint={objective.hint}>
@@ -221,7 +257,11 @@ export function RunConfig({
               const id = `${uid}-w-${k}`;
               const err = show(`weight_${k}`);
               return (
-                <div className="weight" key={k} data-invalid={!!err || undefined}>
+                <div
+                  className="weight"
+                  key={k}
+                  data-invalid={!!err || undefined}
+                >
                   <label htmlFor={id}>{WEIGHT_LABELS[k]}</label>
                   <input
                     id={id}
@@ -233,23 +273,43 @@ export function RunConfig({
                     value={draft.weights[k]}
                     aria-invalid={!!err || undefined}
                     title={err}
-                    onChange={(e) => set("weights", { ...draft.weights, [k]: e.target.value })}
+                    onChange={(e) =>
+                      set("weights", { ...draft.weights, [k]: e.target.value })
+                    }
                   />
                 </div>
               );
             })}
-            <p className={show("weights") || WEIGHT_KEYS.some((k) => show(`weight_${k}`)) ? "field-error" : "field-hint"}>
+            <p
+              className={
+                show("weights") || WEIGHT_KEYS.some((k) => show(`weight_${k}`))
+                  ? "field-error"
+                  : "field-hint"
+              }
+            >
               {show("weights") ||
-                (WEIGHT_KEYS.some((k) => show(`weight_${k}`)) ? "Each weight must be between 0 and 1." : "Each 0–1; normalized by their sum.")}
+                (WEIGHT_KEYS.some((k) => show(`weight_${k}`))
+                  ? "Each weight must be between 0 and 1."
+                  : "Each 0–1; normalized by their sum.")}
             </p>
           </fieldset>
         )}
 
         <div className="field-pair">
-          <Field id={`${uid}-iterations`} label="Iterations" error={show("iterations")} hint="1–100">
+          <Field
+            id={`${uid}-iterations`}
+            label="Iterations"
+            error={show("iterations")}
+            hint="1–100"
+          >
             {numberInput("iterations")}
           </Field>
-          <Field id={`${uid}-candidates`} label="Batch size" error={show("candidates")} hint="20–50">
+          <Field
+            id={`${uid}-candidates`}
+            label="Batch size"
+            error={show("candidates")}
+            hint="20–50"
+          >
             {numberInput("candidates")}
           </Field>
         </div>
@@ -257,7 +317,9 @@ export function RunConfig({
         <div className="budget">
           <span>Evaluation budget</span>
           <strong className="num">
-            {budgetKnown ? `≤ ${(iterations * candidates).toLocaleString()}` : "—"}
+            {budgetKnown
+              ? `≤ ${(iterations * candidates).toLocaleString()}`
+              : "—"}
             <small> candidates</small>
           </strong>
         </div>
@@ -271,11 +333,26 @@ export function RunConfig({
             onClick={() => setShowAdvanced((v) => !v)}
           >
             Reproducibility
-            {errors.seed && touched && <AlertCircle size={13} className="text-bad" aria-label="Has an error" />}
+            {errors.seed && touched && (
+              <AlertCircle
+                size={13}
+                className="text-bad"
+                aria-label="Has an error"
+              />
+            )}
             <ChevronDown size={14} aria-hidden="true" />
           </button>
-          <div className="disclosure-body" id={`${uid}-advanced`} hidden={!showAdvanced && !(errors.seed && touched)}>
-            <Field id={`${uid}-seed`} label="Random seed" error={show("seed")} hint="Same seed + same config → same search.">
+          <div
+            className="disclosure-body"
+            id={`${uid}-advanced`}
+            hidden={!showAdvanced && !(errors.seed && touched)}
+          >
+            <Field
+              id={`${uid}-seed`}
+              label="Random seed"
+              error={show("seed")}
+              hint="Same seed + same config → same search."
+            >
               {numberInput("seed")}
             </Field>
             <p className="engine">{simulator || "RDKit engine"}</p>
@@ -284,20 +361,38 @@ export function RunConfig({
 
         <div className="config-actions">
           {active ? (
-            <button type="button" className="btn btn-outline btn-block" onClick={onStop} disabled={stopping}>
-              {stopping ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : <Square size={12} fill="currentColor" aria-hidden="true" />}
+            <button
+              type="button"
+              className="btn btn-outline btn-block"
+              onClick={onStop}
+              disabled={stopping}
+            >
+              {stopping ? (
+                <LoaderCircle size={15} className="spin" aria-hidden="true" />
+              ) : (
+                <Square size={12} fill="currentColor" aria-hidden="true" />
+              )}
               {stopping ? "Stopping…" : "Stop run"}
             </button>
           ) : (
-            <button type="submit" className="btn btn-accent btn-block btn-lg" disabled={!canLaunch || launching} aria-describedby={`${uid}-launch-note`}>
-              {launching ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Play size={14} fill="currentColor" aria-hidden="true" />}
+            <button
+              type="submit"
+              className="btn btn-accent btn-block btn-lg"
+              disabled={!canLaunch || launching}
+              aria-describedby={`${uid}-launch-note`}
+            >
+              {launching ? (
+                <LoaderCircle size={16} className="spin" aria-hidden="true" />
+              ) : (
+                <Play size={14} fill="currentColor" aria-hidden="true" />
+              )}
               {launching ? "Starting run…" : "Launch optimization"}
             </button>
           )}
           <p className="config-note" id={`${uid}-launch-note`}>
             <ShieldCheck size={14} aria-hidden="true" />
-            {chainMode === "base-sepolia"
-              ? "Each generation is hash-linked and queued for Base Sepolia."
+            {chainMode && chainMode !== "local-only"
+              ? `Each generation is hash-linked and queued for ${modeName(chainMode)}.`
               : "Each generation is hash-linked locally. No onchain transactions."}
           </p>
         </div>

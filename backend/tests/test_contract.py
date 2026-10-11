@@ -31,3 +31,11 @@ def test_contract_commits_enforces_lineage_and_owner():
     contract.functions.commit(run, 1, candidate, 90000000, first, second).transact({"from": owner})
     assert contract.functions.heads(run).call() == second
     assert contract.functions.counts(run).call() == 2
+    assert contract.functions.recordsByIteration(run, 0).call() == first
+    assert contract.functions.recordsByIteration(run, 1).call() == second
+    assert contract.functions.FITNESS_SCALE().call() == 100000000
+    other = bytes([9]) * 32
+    contract.functions.commit(other, 0, candidate, 1, zero, bytes([10])*32).transact({"from": owner})
+    assert contract.functions.counts(other).call() == 1
+    with pytest.raises(Exception, match="execution reverted"):
+        contract.functions.commit(zero, 0, candidate, 1, zero, bytes([11])*32).transact({"from": owner})

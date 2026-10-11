@@ -55,7 +55,7 @@ def record_experiment(run, iteration, best, stats, parent, advice):
               "smiles": best["smiles"], "properties": best["properties"], "scores": best["scores"], "fitness": best["fitness"],
               "objective": config, "simulator": chemistry.VERSION, "timestamp": now(), "mutation": best.get("mutation", {"method": "seed"}),
               "candidate_hash": candidate_hash(best["smiles"]), "parent_hash": parent, "stats": stats, "agent": advice}
-    exp = {"record": record, "hash": digest(record), "proof": {"status": "pending" if run["chain_mode"] == "base-sepolia" else "local-only", "contract_address": run.get("contract_address"), "chain_id": 84532 if run["chain_mode"] == "base-sepolia" else None}}
+    exp = {"record": record, "hash": digest(record), "proof": {"status": "pending" if run["chain_mode"] != "local-only" else "local-only", "contract_address": run.get("contract_address"), "chain_id": run.get("chain_id"), "network": run["chain_mode"]}}
     store.save_experiment(exp)
     if exp["proof"]["status"] == "pending":
         queue.put_nowait(record["id"])
@@ -101,15 +101,35 @@ async def commitment_worker():
         try:
             if exp["proof"].get("status") == "verified":
                 continue
+            iteration = exp["record"]["iteration"]
+            if iteration:
+                parent = store.experiment(f"{exp['record']['run_id']}:{iteration - 1}")
+                if not parent or parent["proof"]["status"] != "verified":
+                    raise RuntimeError("Parent commitment is not verified; retry commitments in generation order.")
+            intent = store.intent(id)
             if not exp["proof"].get("transaction_hash"):
-                submission = await blockchain.bridge("submit", exp)
+                blockers = [e for e in store.unresolved_intents() if e["record"]["id"] != id]
+                if blockers:
+                    raise RuntimeError(f"Reconcile unresolved transaction for {blockers[0]['record']['id']} before signing another nonce.")
+                submission = await blockchain.bridge("prepare", exp)
+                intent = {"serialized_transaction": submission.pop("serialized_transaction")} if "serialized_transaction" in submission else None
                 exp["proof"].update(submission)
-                store.save_experiment(exp)
+                if intent:
+                    store.save_intent(exp, intent)
+                else:
+                    store.save_experiment(exp)
+                if exp["proof"]["status"] == "verified":
+                    continue
+            if intent:
+                await blockchain.bridge("broadcast", {**exp, "proof": {**exp["proof"], **intent}})
             receipt = await blockchain.bridge("receipt", exp)
             exp["proof"].update(receipt)
-            exp["proof"]["status"] = "verified" if receipt["status"] == "success" else "failed"
-            if receipt["status"] != "success":
-                exp["proof"]["error"] = "Transaction reverted."
+            exp["proof"]["status"] = "verified" if receipt["status"] == "verified" else "failed"
+            if receipt["status"] == "reverted":
+                exp["proof"]["reverted"] = True
+                exp["proof"]["error"] = "Transaction reverted; retry may sign a new transaction."
+            elif receipt["status"] != "verified":
+                exp["proof"]["error"] = "Receipt, event or contract storage verification failed."
             else:
                 exp["proof"].pop("error", None)
             store.save_experiment(exp)
@@ -124,13 +144,17 @@ async def commitment_worker():
 async def lifespan(app):
     global queue
     queue = asyncio.Queue()
+    pending = []
     for run in store.runs():
         if run["status"] == "running":
             run["status"] = "interrupted"
             store.save_run(run)
         for exp in store.experiments(run["id"]):
             if exp["proof"]["status"] == "pending":
-                queue.put_nowait(exp["record"]["id"])
+                pending.append(exp)
+    # Reconcile a durable signed nonce before allocating any new one.
+    for exp in sorted(pending, key=lambda e: (not bool(store.intent(e["record"]["id"])), e["record"]["timestamp"])):
+        queue.put_nowait(exp["record"]["id"])
     worker = asyncio.create_task(commitment_worker())
     yield
     worker.cancel()
@@ -143,8 +167,14 @@ app = FastAPI(title="Proof of Discovery", lifespan=lifespan)
 
 
 @app.get("/api/health")
-def health():
-    return {"status": "ok", "simulator": chemistry.VERSION, "chain_mode": "base-sepolia" if blockchain.configured() else "local-only", "agent": "llm" if os.getenv("LLM_API_KEY") else "heuristic"}
+async def health():
+    chain = {**blockchain.network(), "ready": False}
+    if blockchain.configured():
+        try:
+            chain.update(await blockchain.bridge("status"))
+        except Exception as error:
+            chain["error"] = str(error)
+    return {"status": "ok", "simulator": chemistry.VERSION, "chain_mode": blockchain.network()["network"] if blockchain.configured() else "local-only", "chain": chain, "agent": "llm" if os.getenv("LLM_API_KEY") else "heuristic"}
 
 
 @app.get("/api/runs")
@@ -160,9 +190,15 @@ async def create_run(config: RunConfig):
         initial = await asyncio.to_thread(chemistry.evaluate, config.smiles, config.model_dump())
     except ValueError as e:
         raise HTTPException(422, str(e))
+    chain = blockchain.network()
+    if blockchain.configured():
+        try:
+            await blockchain.bridge("status")
+        except Exception as error:
+            raise HTTPException(503, f"Onchain preflight failed: {error}")
     id = str(uuid.uuid4())
     run = {"id": id, "config": config.model_dump(), "initial": initial, "status": "running", "created_at": now(), "iteration": 0,
-           "best_fitness": initial["fitness"], "evaluated": 0, "attempted": 0, "chain_mode": "base-sepolia" if blockchain.configured() else "local-only", "contract_address": os.getenv("CONTRACT_ADDRESS") if blockchain.configured() else None}
+           "best_fitness": initial["fitness"], "evaluated": 0, "attempted": 0, "chain_mode": chain["network"] if blockchain.configured() else "local-only", "chain_id": chain["chain_id"] if blockchain.configured() else None, "contract_address": os.getenv("CONTRACT_ADDRESS") if blockchain.configured() else None}
     store.save_run(run)
     tasks[id] = asyncio.create_task(optimize(id, initial))
     return run
@@ -187,9 +223,12 @@ def retry(id: str):
     require_run(id)
     for exp in store.experiments(id):
         if exp["proof"]["status"] == "failed":
-            if exp["proof"].get("block_number"):
+            if exp["proof"].pop("reverted", False):
+                store.clear_intent(exp["record"]["id"])
                 exp["proof"].pop("transaction_hash", None)
                 exp["proof"].pop("block_number", None)
+                for field in ("block_hash", "confirmations", "event_matches", "storage_matches"):
+                    exp["proof"].pop(field, None)
             exp["proof"]["status"] = "pending"
             store.save_experiment(exp)
             queue.put_nowait(exp["record"]["id"])
@@ -246,6 +285,7 @@ async def verify(id: str):
         try:
             checked = await blockchain.bridge("verify", exp)
             result["onchain_matches"] = checked["matches"]
+            result["onchain"] = checked
             if not checked["matches"]:
                 result["status"] = "failed"
         except Exception as e:

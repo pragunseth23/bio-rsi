@@ -99,7 +99,9 @@ def test_unavailable_llm_falls_back(monkeypatch):
 
 
 def test_unavailable_blockchain_does_not_break_optimization(tmp_path, monkeypatch):
-    async def failing_bridge(action, exp):
+    async def failing_bridge(action, exp=None):
+        if action == "status":
+            return {"ready": True}
         raise RuntimeError("Test RPC unavailable")
     monkeypatch.setattr(main, "store", Store(tmp_path / "rpc.sqlite"))
     monkeypatch.setattr(main.blockchain, "configured", lambda: True)
@@ -145,3 +147,40 @@ def test_illustrative_geometry_is_real_and_deterministic():
     assert geometry == chemistry.scene_data("CCO")
     with pytest.raises(ValueError):
         chemistry.scene_data("not-a-molecule")
+
+
+def test_onchain_preflight_rejects_bad_setup(tmp_path, monkeypatch):
+    async def failing_status(action, exp=None):
+        raise RuntimeError("Configured wallet is not the contract owner")
+    monkeypatch.setattr(main, "store", Store(tmp_path / "preflight.sqlite"))
+    monkeypatch.setattr(main.blockchain, "configured", lambda: True)
+    monkeypatch.setattr(main.blockchain, "bridge", failing_status)
+    with TestClient(main.app) as client:
+        assert client.get("/api/health").json()["chain"]["ready"] is False
+        response = client.post("/api/runs", json={"iterations": 1})
+        assert response.status_code == 503
+        assert "not the contract owner" in response.json()["detail"]
+        assert client.get("/api/runs").json() == []
+
+
+@pytest.mark.parametrize("reverted", [False, True])
+def test_retry_reuses_intent_unless_receipt_explicitly_reverted(tmp_path, monkeypatch, reverted):
+    import asyncio
+    db = Store(tmp_path / 'retry.sqlite')
+    monkeypatch.setattr(main, 'store', db)
+    monkeypatch.setattr(main, 'queue', asyncio.Queue())
+    db.save_run({'id': 'run'})
+    exp = {'record': {'id': 'run:0', 'run_id': 'run', 'iteration': 0}, 'proof': {'status': 'failed', 'transaction_hash': 'original-hash', 'block_number': 9, 'block_hash': 'original-block', 'reverted': reverted}}
+    db.save_experiment(exp)
+    db.save_intent(exp, {'serialized_transaction': 'original-signed-bytes'})
+    main.retry('run')
+    recovered = db.experiment('run:0')
+    assert recovered['proof']['status'] == 'pending'
+    if reverted:
+        assert not db.intent('run:0')
+        assert 'transaction_hash' not in recovered['proof']
+        assert 'block_hash' not in recovered['proof']
+    else:
+        assert db.intent('run:0')['serialized_transaction'] == 'original-signed-bytes'
+        assert recovered['proof']['transaction_hash'] == 'original-hash'
+    assert main.queue.get_nowait() == 'run:0'

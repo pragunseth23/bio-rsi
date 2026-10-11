@@ -25,6 +25,14 @@ export function LabShell({ children }: { children: React.ReactNode }) {
       />
       <main id="main-content" tabIndex={-1}>
         <div className="banners">
+          {lab.health?.chain?.error && (
+            <div className="banner" data-tone="bad" role="alert">
+              <p>
+                <strong>Onchain setup needs attention.</strong>{" "}
+                {lab.health.chain.error}
+              </p>
+            </div>
+          )}
           {lab.connection === "offline" && (
             <div className="banner" data-tone="bad" role="alert">
               <WifiOff size={16} aria-hidden="true" />

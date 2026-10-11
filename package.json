@@ -10,7 +10,8 @@
     "contract:compile": "node scripts/chain.mjs compile",
     "contract:deploy": "node --env-file-if-exists=.env scripts/chain.mjs deploy",
     "dev:all": "bash scripts/dev.sh",
-    "test:e2e": "node tests/e2e/workflow.mjs"
+    "test:e2e": "node tests/e2e/workflow.mjs",
+    "chain:status": "node --env-file-if-exists=.env scripts/chain.mjs status"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.0",

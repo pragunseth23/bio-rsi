@@ -1,4 +1,5 @@
 "use client";
+import { explorerLink } from "@/lib/chain";
 import { memo, useEffect, useRef } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { Molecule } from "./molecule";
@@ -9,14 +10,18 @@ import type { Experiment } from "@/lib/types";
 /** Property changes from the parent record (the previous generation's best). */
 function Change({ exp, parent }: { exp: Experiment; parent?: Experiment }) {
   if (!parent) return <span className="muted">seed</span>;
-  if (parent.record.smiles === exp.record.smiles) return <span className="muted">unchanged elite</span>;
+  if (parent.record.smiles === exp.record.smiles)
+    return <span className="muted">unchanged elite</span>;
   const p = exp.record.properties;
   const q = parent.record.properties;
   return (
     <span className="change">
-      <b data-sign={Math.sign(exp.record.fitness - parent.record.fitness)}>{signed(exp.record.fitness - parent.record.fitness)}</b>
+      <b data-sign={Math.sign(exp.record.fitness - parent.record.fitness)}>
+        {signed(exp.record.fitness - parent.record.fitness)}
+      </b>
       <small>
-        QED {signed(p.qed - q.qed, 2)} · logP {signed(p.logp - q.logp, 1)} · MW {signed(p.mw - q.mw, 0)}
+        QED {signed(p.qed - q.qed, 2)} · logP {signed(p.logp - q.logp, 1)} · MW{" "}
+        {signed(p.mw - q.mw, 0)}
       </small>
     </span>
   );
@@ -38,13 +43,15 @@ export const ExperimentTable = memo(function ExperimentTable({
 }) {
   const seen = useRef<Set<string> | null>(null);
   const fresh = new Set<string>();
-  if (seen.current) experiments.forEach((e) => !seen.current!.has(e.hash) && fresh.add(e.hash));
+  if (seen.current)
+    experiments.forEach((e) => !seen.current!.has(e.hash) && fresh.add(e.hash));
   useEffect(() => {
     seen.current = new Set(experiments.map((e) => e.hash));
   }, [experiments]);
 
   const byIteration = new Map(all.map((e) => [e.record.iteration, e]));
-  if (experiments.length === 0) return <div className="table-empty">{empty}</div>;
+  if (experiments.length === 0)
+    return <div className="table-empty">{empty}</div>;
   return (
     <div className="table-wrap">
       <table className="records">
@@ -52,11 +59,21 @@ export const ExperimentTable = memo(function ExperimentTable({
           <tr>
             <th scope="col">Gen</th>
             <th scope="col">Best molecule</th>
-            <th scope="col" className="num-col">Fitness</th>
-            <th scope="col" className="hide-md">Change vs parent</th>
-            <th scope="col" className="num-col hide-lg">Scored</th>
-            <th scope="col" className="hide-sm">Commitment</th>
-            <th scope="col" className="hide-lg">Parent → record</th>
+            <th scope="col" className="num-col">
+              Fitness
+            </th>
+            <th scope="col" className="hide-md">
+              Change vs parent
+            </th>
+            <th scope="col" className="num-col hide-lg">
+              Scored
+            </th>
+            <th scope="col" className="hide-sm">
+              Commitment
+            </th>
+            <th scope="col" className="hide-lg">
+              Parent → record
+            </th>
             <th scope="col">
               <span className="sr-only">Inspect</span>
             </th>
@@ -79,7 +96,10 @@ export const ExperimentTable = memo(function ExperimentTable({
               </td>
               <td className="num num-col strong">{fmt(e.record.fitness)}</td>
               <td className="hide-md">
-                <Change exp={e} parent={byIteration.get(e.record.iteration - 1)} />
+                <Change
+                  exp={e}
+                  parent={byIteration.get(e.record.iteration - 1)}
+                />
               </td>
               <td className="num num-col hide-lg">
                 {e.record.iteration === 0 ? (
@@ -96,7 +116,11 @@ export const ExperimentTable = memo(function ExperimentTable({
                 {e.proof.transaction_hash && (
                   <a
                     className="tx-link"
-                    href={`https://sepolia.basescan.org/tx/${e.proof.transaction_hash}`}
+                    href={explorerLink(
+                      e.proof.chain_id,
+                      "tx",
+                      e.proof.transaction_hash,
+                    )}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(ev) => ev.stopPropagation()}
@@ -107,7 +131,10 @@ export const ExperimentTable = memo(function ExperimentTable({
                 )}
               </td>
               <td className="hide-lg">
-                <code className="hash" title={`parent ${e.record.parent_hash}\nrecord ${e.hash}`}>
+                <code
+                  className="hash"
+                  title={`parent ${e.record.parent_hash}\nrecord ${e.hash}`}
+                >
                   {e.record.parent_hash.slice(0, 8)}… → {e.hash.slice(0, 8)}…
                 </code>
               </td>
