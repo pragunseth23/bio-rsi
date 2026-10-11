@@ -224,7 +224,7 @@ export function VerificationView({
             <div className="verify-actions">
               <button type="button" className="btn btn-ink" onClick={verify} disabled={verifying}>
                 {verifying ? <LoaderCircle size={15} className="spin" aria-hidden="true" /> : <ShieldCheck size={15} aria-hidden="true" />}
-                {verifying ? "Verifying on the server…" : verification ? "Verify again" : "Verify record"}
+                {verifying ? "Verifying on the server…" : verification ? "Verify again" : "Verify experiment"}
               </button>
               {current.proof.status === "failed" && (
                 <button type="button" className="btn btn-outline" onClick={onRetryCommitments}>

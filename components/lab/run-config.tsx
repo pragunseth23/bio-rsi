@@ -6,7 +6,7 @@ import { LIMITS, PRESETS, WEIGHT_KEYS, type FieldErrors } from "@/lib/config";
 import type { ConfigDraft, Objective } from "@/lib/types";
 
 const OBJECTIVES: { value: Objective; label: string; hint: string }[] = [
-  { value: "qed", label: "Maximise drug-likeness (QED)", hint: "Fitness is RDKit QED, 0–1. Higher is better." },
+  { value: "qed", label: "Maximize drug-likeness (QED)", hint: "Fitness is RDKit QED, 0–1. Higher is better." },
   { value: "logp", label: "Target lipophilicity (logP)", hint: "Fitness = −|calculated logP − target|. Best is 0." },
   { value: "multi", label: "Balanced multi-objective", hint: "Weighted mean of QED, logP, MW, TPSA and rule-based constraints." },
 ];
@@ -240,7 +240,7 @@ export function RunConfig({
             })}
             <p className={show("weights") || WEIGHT_KEYS.some((k) => show(`weight_${k}`)) ? "field-error" : "field-hint"}>
               {show("weights") ||
-                (WEIGHT_KEYS.some((k) => show(`weight_${k}`)) ? "Each weight must be between 0 and 1." : "Each 0–1; normalised by their sum.")}
+                (WEIGHT_KEYS.some((k) => show(`weight_${k}`)) ? "Each weight must be between 0 and 1." : "Each 0–1; normalized by their sum.")}
             </p>
           </fieldset>
         )}
@@ -291,7 +291,7 @@ export function RunConfig({
           ) : (
             <button type="submit" className="btn btn-accent btn-block btn-lg" disabled={!canLaunch || launching} aria-describedby={`${uid}-launch-note`}>
               {launching ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Play size={14} fill="currentColor" aria-hidden="true" />}
-              {launching ? "Starting run…" : "Launch optimisation"}
+              {launching ? "Starting run…" : "Launch optimization"}
             </button>
           )}
           <p className="config-note" id={`${uid}-launch-note`}>

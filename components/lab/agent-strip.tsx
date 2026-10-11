@@ -19,7 +19,7 @@ export const AgentStrip = memo(function AgentStrip({ latest, agentMode }: { late
         </p>
         <p className="agent-text">
           {agent?.explanation ||
-            "When a run starts, the strategy is chosen from the seed’s properties and reviewed every five generations: explore new fragments, or favour polar ones when logP overshoots the target."}
+            "When a run starts, the strategy is chosen from the seed’s properties and reviewed every five generations: explore new fragments, or favor polar ones when logP overshoots the target."}
         </p>
       </div>
       <span className="agent-cadence">Reviewed every 5 generations</span>

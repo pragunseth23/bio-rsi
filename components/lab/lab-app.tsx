@@ -160,7 +160,7 @@ export function LabApp() {
               Set it up, let it run, <em>read the notebook.</em>
             </h2>
             <p className="console-lede">
-              Everything here talks to the live optimiser. Nothing is precomputed. Every number on this page comes from
+              Everything here talks to the live optimizer. Nothing is precomputed. Every number on this page comes from
               RDKit or from the record chain.
             </p>
           </header>

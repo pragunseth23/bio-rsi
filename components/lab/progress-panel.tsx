@@ -27,7 +27,7 @@ export const ProgressPanel = memo(function ProgressPanel({ run, experiments, obj
   return (
     <section className="panel progress" aria-labelledby="progress-title">
       <header className="panel-head">
-        <h3 id="progress-title">Optimisation progress</h3>
+        <h3 id="progress-title">Optimization progress</h3>
         <span className="panel-meta">{kind === "logp" ? "−|logP − target|" : kind === "multi" ? "Weighted score" : "QED"}</span>
       </header>
       <div className="progress-top">

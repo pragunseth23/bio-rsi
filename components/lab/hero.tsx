@@ -90,7 +90,7 @@ export const Hero = memo(function Hero({
         <div className="specimen-head">
           <span className="specimen-kicker">
             <span className={`live-dot ${active ? "is-live" : ""}`} aria-hidden="true" />
-            {active ? "Optimising now" : specimenLabel}
+            {active ? "Optimizing now" : specimenLabel}
           </span>
           <code className="specimen-smiles" title={info?.smiles || sceneSmiles}>
             {info?.smiles || sceneSmiles}

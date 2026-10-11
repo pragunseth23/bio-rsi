@@ -4,7 +4,7 @@ import { Activity, GitBranch, ShieldCheck } from "lucide-react";
 import type { Tab } from "@/hooks/use-hash-tab";
 
 const ITEMS: { id: Tab; label: string; icon: typeof Activity }[] = [
-  { id: "optimization", label: "Optimisation", icon: Activity },
+  { id: "optimization", label: "Optimization", icon: Activity },
   { id: "history", label: "History", icon: GitBranch },
   { id: "verification", label: "Verification", icon: ShieldCheck },
 ];

@@ -8,8 +8,8 @@ const display = Newsreader({ subsets: ["latin"], style: ["normal", "italic"], ax
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Proof of Discovery · Molecular optimisation",
-  description: "Evolutionary molecular optimisation scored with RDKit, with a verifiable SHA-256 experiment trail.",
+  title: "Proof of Discovery · Molecular optimization",
+  description: "Evolutionary molecular optimization scored with RDKit, with a verifiable SHA-256 experiment trail.",
 };
 
 export const viewport: Viewport = {

@@ -28,10 +28,10 @@ Backend (`backend/main.py`):
 | --- | --- | --- |
 | GET | `/api/health` | simulator version, `chain_mode`, agent mode |
 | GET | `/api/runs` | all runs, newest first |
-| POST | `/api/runs` | validate `RunConfig`, evaluate seed with RDKit, start async optimisation task (max 3 active → 429) |
+| POST | `/api/runs` | validate `RunConfig`, evaluate seed with RDKit, start async optimization task (max 3 active → 429) |
 | GET | `/api/runs/{id}` | one run |
 | POST | `/api/runs/{id}/stop` | marks a *running* run `stopped`; the loop checks status each iteration |
-| POST | `/api/runs/{id}/retry` | **re-queues failed onchain commitments** for the run. It does *not* re-run the optimisation. |
+| POST | `/api/runs/{id}/retry` | **re-queues failed onchain commitments** for the run. It does *not* re-run the optimization. |
 | GET | `/api/runs/{id}/experiments` | ordered experiment records |
 | GET | `/api/runs/{id}/export` | JSON attachment: run + experiments + `canonical_json` |
 | GET | `/api/runs/{id}/stream` | SSE. Every 0.4 s sends the full `{run, experiments}` snapshot when it changed, otherwise a heartbeat comment; sends `event: finished` once the run is not running and no proofs are pending |

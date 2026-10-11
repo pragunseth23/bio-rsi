@@ -27,11 +27,11 @@ Production frontend: `npm run build && npm start`, with the Python service runni
 
 ## Demo
 
-1. Select **Ethanol**, **Maximize drug-likeness (QED)**, **30 iterations**, **30 candidates**, seed **42**.
+1. Click **Enter the lab**, select **Ethanol**, **Maximize drug-likeness (QED)**, target logP **2** (default), **30 iterations**, batch size **30**, seed **42** (under *Reproducibility*). With the heuristic agent this run reproducibly climbs from QED 0.407 to 0.946.
 2. Launch optimization. RDKit validates and scores generated candidates; best fitness cannot decrease because elites survive each generation.
-3. Inspect molecular changes, best and average fitness, the agent's strategy, and the experiment trail.
+3. Inspect molecular changes, best and average fitness, the agent's strategy, and the experiment trail (**Lab notebook**: change vs parent, parent → record hash, commitment status).
 4. Open **Verification**, select an experiment, and click **Verify experiment**.
-5. Compare two generations or export the complete run as JSON.
+5. Compare two generations or export the complete run as JSON. Console tabs are linked in the URL (`#lab/history`, `#lab/verification`), so Back/Forward and refresh keep your place.
 
 The seed preset is an actual starting point for stochastic search. No fitness trajectory is hardcoded. The search combines SELFIES token mutations, RDKit fragment attachment, atom replacement and terminal pruning. Up to 12 × batch size attempts per iteration limits stalled searches. Invalid molecules and canonical duplicates are excluded. The evaluated counter counts unique valid candidates actually scored, excluding the seed; attempts also count rejected mutations.
 
@@ -63,9 +63,9 @@ Copy the returned `contract_address` into `.env`, then restart both services. De
 
 The contract emits `ExperimentCommitted(runId, iteration, recordHash, candidateHash, fitness, parentHash)`. `runId` is Keccak-256 of the UUID string. Candidate and record commitments use SHA-256. Fitness is signed and scaled by `10^8`.
 
-Simulation does not wait for transactions. A separate queue submits them sequentially and persists transaction hashes before waiting for receipts. A successful receipt produces the **Onchain committed** badge, block number and BaseScan link. **Verify experiment** additionally reads the stored contract tuple over RPC and compares every field. Only that read confirms the selected record matches contract state. One block confirmation is used for this testnet demo; it does not establish finality.
+Simulation does not wait for transactions. A separate queue submits them sequentially and persists transaction hashes before waiting for receipts. A successful receipt produces the **Committed onchain** badge, block number and BaseScan link. **Verify experiment** additionally reads the stored contract tuple over RPC and compares every field. Only that read confirms the selected record matches contract state. One block confirmation is used for this testnet demo; it does not establish finality.
 
-RPC or transaction errors become `failed`, preserve any submitted transaction hash, and do not crash the optimizer. Use **Retry queued commitments** in the verification view to reconcile failed transactions in generation order. Unconfirmed transactions are checked again before any resubmission. If the RPC remains inaccessible, verification reports unavailable. Pending commitments reload from SQLite on restart. Interrupted optimization runs remain inspectable; start a new run to optimize again.
+RPC or transaction errors become `failed`, preserve any submitted transaction hash, and do not crash the optimizer. Use **Retry failed commitments** in the verification view to reconcile failed transactions in generation order. Unconfirmed transactions are checked again before any resubmission. If the RPC remains inaccessible, verification reports unavailable. Pending commitments reload from SQLite on restart. Interrupted optimization runs remain inspectable; start a new run to optimize again.
 
 Never commit `.env`, private keys or production wallet credentials. The frontend receives no private keys. Without configured credentials and funds, onchain deployment/verification cannot be demonstrated.
 
@@ -106,6 +106,8 @@ Interactive docs: http://127.0.0.1:8000/docs
 | `GET /api/runs/{id}/export` | Full JSON + canonical serialized records |
 | `POST /api/verify/{experiment_id}` | Recompute hashes and read onchain state if committed |
 | `GET /api/molecule/svg?smiles=CCO` | RDKit-generated transparent SVG |
+| `POST /api/molecule/evaluate` | Score a seed exactly as a launch would, without starting a run; returns `{valid, candidate}` or `{valid: false, error}` |
+| `GET /api/molecule/scene?smiles=CCO` | Illustrative 3D conformer for the hero model |
 | `GET /api/health` | Engine version and configured modes |
 
 Example:
