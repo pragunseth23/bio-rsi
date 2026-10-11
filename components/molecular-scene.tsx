@@ -3,267 +3,396 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RotateCcw } from "lucide-react";
+import { Molecule } from "@/components/lab/molecule";
 
 type Geometry = {
+  smiles: string;
+  geometry: "illustrative-conformer" | "2d-layout";
   atoms: { element: string; position: [number, number, number] }[];
   bonds: { start: number; end: number; order: number }[];
 };
-const colors: Record<string, string> = {
-  C: "#b1bacd",
-  N: "#3546ff",
-  O: "#586bff",
-  F: "#f3f3fb",
-  S: "#e8af65",
-  Cl: "#84aec2",
-  P: "#ddb18a",
-  Br: "#b27e69",
-  I: "#8c71be",
+
+export type SceneInfo = {
+  smiles: string;
+  geometry: Geometry["geometry"];
+  atoms: number;
+  elements: Record<string, number>;
 };
+
+/** CPK-derived palette, matched to the RDKit 2D drawings (O red, N blue, S yellow, halogens green). */
+export const ELEMENT_COLORS: Record<string, string> = {
+  C: "#b8bfcc",
+  N: "#6f8bff",
+  O: "#e2635c",
+  F: "#7bd88f",
+  Cl: "#7bd88f",
+  Br: "#b0614f",
+  I: "#8a62c4",
+  S: "#e8bb52",
+  P: "#ee9a52",
+};
+
+const cache = new Map<string, Geometry>();
+const ease = (t: number) => 1 - Math.pow(1 - t, 4);
 
 export function MolecularScene({
   smiles,
   running,
+  onInfo,
 }: {
   smiles: string;
   running: boolean;
+  onInfo?: (info: SceneInfo | null) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const model = useRef<THREE.Group | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [atomCount, setAtomCount] = useState(0);
-  const isRunning = useRef(running);
+  const api = useRef<{
+    load: (g: Geometry) => void;
+    reset: () => void;
+    setRunning: (r: boolean) => void;
+  } | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "unavailable" | "no-webgl">("loading");
+  const onInfoRef = useRef(onInfo);
+  onInfoRef.current = onInfo;
+
   useEffect(() => {
-    isRunning.current = running;
+    api.current?.setRunning(running);
   }, [running]);
+
   useEffect(() => {
     const element = host.current;
     if (!element) return;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: "low-power",
-      });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
     } catch {
-      setUnavailable(true);
-      setLoading(false);
+      setState("no-webgl");
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
     renderer.setClearColor(0x000000, 0);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.3;
+    renderer.toneMappingExposure = 1.15;
+    renderer.domElement.setAttribute("aria-hidden", "true");
     element.appendChild(renderer.domElement);
+
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    camera.position.set(0, 0, 19);
-    const environment = new RoomEnvironment();
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+    const home = new THREE.Vector3(0, 0, 20);
+    camera.position.copy(home);
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const target = pmrem.fromScene(environment, 0.04);
-    scene.environment = target.texture;
+    const environment = new RoomEnvironment();
+    const envTarget = pmrem.fromScene(environment, 0.04);
+    scene.environment = envTarget.texture;
     environment.dispose();
-    const ambient = new THREE.AmbientLight(0xc7d6ff, 1.3);
-    scene.add(ambient);
-    const key = new THREE.DirectionalLight(0xffffff, 4);
-    key.position.set(-5, 8, 7);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0x3e59ff, 7);
-    rim.position.set(8, 2, -3);
-    scene.add(rim);
-    const fill = new THREE.DirectionalLight(0x7486ff, 3);
-    fill.position.set(-6, -3, 3);
-    scene.add(fill);
-    const group = new THREE.Group();
-    scene.add(group);
-    model.current = group;
-    group.rotation.set(0.18, -0.2, -0.25);
+    scene.add(new THREE.AmbientLight(0xd5ddff, 0.9));
+    const key = new THREE.DirectionalLight(0xffffff, 3.2);
+    key.position.set(-6, 8, 8);
+    const rim = new THREE.DirectionalLight(0x5b6cff, 5);
+    rim.position.set(8, 3, -4);
+    const fill = new THREE.DirectionalLight(0x8fa0ff, 1.4);
+    fill.position.set(-5, -4, 4);
+    scene.add(key, rim, fill);
+
+    // tilt (pointer parallax) → spin (entrance) → model
+    const tilt = new THREE.Group();
+    const spin = new THREE.Group();
+    tilt.add(spin);
+    scene.add(tilt);
+    let model: THREE.Group | null = null;
+    let radius = 4;
+
     const controls = new OrbitControls(camera, renderer.domElement);
     renderer.domElement.style.touchAction = "pan-y";
     controls.enableDamping = true;
-    controls.dampingFactor = 0.055;
+    controls.dampingFactor = 0.06;
     controls.enableZoom = false;
     controls.enablePan = false;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.65;
-    controls.rotateSpeed = 0.6;
+    controls.rotateSpeed = 0.55;
+
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const visibility = { onscreen: true };
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        visibility.onscreen = entry.isIntersecting;
-      },
-      { threshold: 0.05 },
-    );
-    observer.observe(element);
-    let frame = 0;
-    const startedAt = performance.now();
-    const animate = () => {
-      frame = requestAnimationFrame(animate);
-      if (!visibility.onscreen || document.hidden) return;
-      controls.autoRotate = !reduce.matches;
-      controls.autoRotateSpeed = isRunning.current ? 1.6 : 0.65;
-      controls.update();
-      group.position.y = reduce.matches
-        ? 0
-        : Math.sin(((performance.now() - startedAt) / 1000) * 0.7) * 0.12;
-      renderer.render(scene, camera);
+    let isRunning = running;
+    let dirty = true;
+    let resetting = false;
+    let entrance = 1; // 0 → 1 progress of model entrance
+    let entranceStart = 0;
+    const pointer = { x: 0, y: 0 };
+    controls.addEventListener("change", () => (dirty = true));
+    controls.addEventListener("start", () => (resetting = false));
+
+    const fit = () => {
+      const w = element.clientWidth || 1;
+      const h = element.clientHeight || 1;
+      const visibleH = 2 * home.length() * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const visibleW = visibleH * (w / h);
+      // Molecule bounding diameter fills ~92% of the smaller visible dimension (projected extent is smaller).
+      const s = (0.46 * Math.min(visibleH, visibleW)) / radius;
+      spin.scale.setScalar(s);
     };
+
+    const disposeModel = (group: THREE.Group) => {
+      group.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          (child.material as THREE.Material).dispose();
+        }
+      });
+    };
+
+    const load = (data: Geometry) => {
+      const positions = data.atoms.map((a) => new THREE.Vector3(...a.position));
+      const center = positions.reduce((sum, p) => sum.add(p), new THREE.Vector3()).divideScalar(positions.length || 1);
+      positions.forEach((p) => p.sub(center));
+      radius = Math.max(1.2, ...positions.map((p) => p.length())) + 0.75;
+      const group = new THREE.Group();
+      const sphere = new THREE.SphereGeometry(1, 48, 32);
+      data.atoms.forEach((atom, i) => {
+        const mesh = new THREE.Mesh(
+          sphere.clone(),
+          new THREE.MeshPhysicalMaterial({
+            color: ELEMENT_COLORS[atom.element] || "#aab3c5",
+            metalness: atom.element === "C" ? 0.85 : 0.35,
+            roughness: atom.element === "C" ? 0.2 : 0.28,
+            clearcoat: 1,
+            clearcoatRoughness: 0.1,
+            envMapIntensity: 1.2,
+          }),
+        );
+        mesh.scale.setScalar(atom.element === "C" ? 0.6 : 0.66);
+        mesh.position.copy(positions[i]);
+        group.add(mesh);
+      });
+      sphere.dispose();
+      const up = new THREE.Vector3(0, 1, 0);
+      data.bonds.forEach((bond) => {
+        const a = positions[bond.start];
+        const b = positions[bond.end];
+        const delta = new THREE.Vector3().subVectors(b, a);
+        const length = delta.length();
+        const dir = delta.clone().normalize();
+        // Double/triple bonds drawn as parallel rods offset perpendicular to the bond.
+        const count = bond.order >= 2.5 ? 3 : bond.order >= 1.75 ? 2 : 1;
+        const side = new THREE.Vector3().crossVectors(dir, Math.abs(dir.z) < 0.9 ? new THREE.Vector3(0, 0, 1) : up).normalize();
+        for (let k = 0; k < count; k++) {
+          const offset = (k - (count - 1) / 2) * 0.22;
+          const rod = new THREE.Mesh(
+            new THREE.CylinderGeometry(count > 1 ? 0.08 : 0.13, count > 1 ? 0.08 : 0.13, length, 16),
+            new THREE.MeshPhysicalMaterial({ color: "#8d96b3", metalness: 0.8, roughness: 0.25, clearcoat: 1 }),
+          );
+          rod.position.copy(a).add(b).multiplyScalar(0.5).addScaledVector(side, offset);
+          rod.quaternion.setFromUnitVectors(up, dir);
+          group.add(rod);
+        }
+      });
+      if (model) {
+        spin.remove(model);
+        disposeModel(model);
+      }
+      model = group;
+      group.rotation.set(0.2, -0.35, -0.2);
+      spin.add(group);
+      fit();
+      entrance = reduce.matches ? 1 : 0;
+      entranceStart = performance.now();
+      dirty = true;
+      start();
+    };
+
+    const reset = () => {
+      resetting = true;
+      dirty = true;
+      if (reduce.matches) {
+        camera.position.copy(home);
+        controls.update();
+        resetting = false;
+      }
+      start();
+    };
+
+    let frame = 0;
+    let looping = false;
+    let onscreen = true;
+    const shouldLoop = () => onscreen && !document.hidden;
+    const tick = (now: number) => {
+      if (!shouldLoop()) {
+        looping = false;
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+      const still = reduce.matches;
+      controls.autoRotate = !still && !resetting;
+      controls.autoRotateSpeed = isRunning ? 1.5 : 0.55;
+      if (resetting) {
+        camera.position.lerp(home, 0.12);
+        if (camera.position.distanceTo(home) < 0.01) {
+          camera.position.copy(home);
+          resetting = false;
+        }
+        dirty = true;
+      }
+      controls.update();
+      if (!still) {
+        // Pointer parallax with inertia.
+        tilt.rotation.y += (pointer.x * 0.22 - tilt.rotation.y) * 0.06;
+        tilt.rotation.x += (pointer.y * 0.16 - tilt.rotation.x) * 0.06;
+        tilt.position.y = Math.sin(now / 1400) * 0.12;
+        if (entrance < 1) {
+          entrance = Math.min(1, (now - entranceStart) / 900);
+          const e = ease(entrance);
+          spin.rotation.y = (1 - e) * -0.9;
+          tilt.scale.setScalar(0.86 + 0.14 * e);
+        }
+        dirty = true;
+      }
+      if (dirty) {
+        renderer.render(scene, camera);
+        dirty = false;
+      }
+    };
+    const start = () => {
+      if (looping || !shouldLoop()) return;
+      looping = true;
+      frame = requestAnimationFrame(tick);
+    };
+
+    const observer = new IntersectionObserver(([entry]) => {
+      onscreen = entry.isIntersecting;
+      if (onscreen) {
+        dirty = true;
+        start();
+      }
+    });
+    observer.observe(element);
+    const onVisibility = () => {
+      if (!document.hidden) {
+        dirty = true;
+        start();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const onPointer = (e: PointerEvent) => {
+      const r = element.getBoundingClientRect();
+      pointer.x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+      pointer.y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    };
+    const onLeave = () => {
+      pointer.x = 0;
+      pointer.y = 0;
+    };
+    const hero = element.closest("[data-parallax-root]") || element;
+    hero.addEventListener("pointermove", onPointer as EventListener);
+    hero.addEventListener("pointerleave", onLeave);
+    const onReduce = () => {
+      dirty = true;
+      start();
+    };
+    reduce.addEventListener("change", onReduce);
+
     const resize = new ResizeObserver(() => {
-      const width = element.clientWidth,
-        height = element.clientHeight;
-      renderer.setSize(width, height);
-      if (group.userData.radius)
-        group.scale.setScalar((width < 600 ? 4 : 6.5) / group.userData.radius);
-      camera.aspect = width / height;
+      const w = element.clientWidth;
+      const h = element.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      fit();
+      dirty = true;
+      start();
     });
     resize.observe(element);
-    const handleLoss = (event: Event) => {
+    const onLost = (event: Event) => {
       event.preventDefault();
-      setUnavailable(true);
+      setState("no-webgl");
     };
-    renderer.domElement.addEventListener("webglcontextlost", handleLoss);
-    animate();
+    renderer.domElement.addEventListener("webglcontextlost", onLost);
+
+    api.current = {
+      load,
+      reset,
+      setRunning: (r) => {
+        isRunning = r;
+      },
+    };
+    start();
+
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
       resize.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      hero.removeEventListener("pointermove", onPointer as EventListener);
+      hero.removeEventListener("pointerleave", onLeave);
+      reduce.removeEventListener("change", onReduce);
+      renderer.domElement.removeEventListener("webglcontextlost", onLost);
       controls.dispose();
-      group.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          const mats = Array.isArray(child.material)
-            ? child.material
-            : [child.material];
-          mats.forEach((m) => m.dispose());
-        }
-      });
-      target.dispose();
+      if (model) disposeModel(model);
+      envTarget.dispose();
       pmrem.dispose();
       renderer.dispose();
-      renderer.domElement.removeEventListener("webglcontextlost", handleLoss);
       renderer.domElement.remove();
-      model.current = null;
+      api.current = null;
     };
+    // The renderer lives for the component's lifetime; `running` is synced via api.setRunning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    fetch(`/api/molecule/scene?smiles=${encodeURIComponent(smiles)}`, {
-      signal: controller.signal,
-    })
-      .then(async (r) => {
+    const apply = (data: Geometry) => {
+      api.current?.load(data);
+      const elements: Record<string, number> = {};
+      data.atoms.forEach((a) => (elements[a.element] = (elements[a.element] || 0) + 1));
+      onInfoRef.current?.({ smiles: data.smiles, geometry: data.geometry, atoms: data.atoms.length, elements });
+      setState((s) => (s === "no-webgl" ? s : "ready"));
+    };
+    const cached = cache.get(smiles);
+    if (cached) {
+      apply(cached);
+      return;
+    }
+    setState((s) => (s === "no-webgl" ? s : "loading"));
+    fetch(`/api/molecule/scene?smiles=${encodeURIComponent(smiles)}`, { signal: controller.signal })
+      .then((r) => {
         if (!r.ok) throw new Error("Geometry unavailable");
         return r.json() as Promise<Geometry>;
       })
       .then((data) => {
-        const group = model.current;
-        if (!group) {
-          setLoading(false);
-          return;
-        }
-        while (group.children.length) {
-          const child = group.children[0];
-          group.remove(child);
-          if (child instanceof THREE.Mesh) {
-            child.geometry.dispose();
-            (child.material as THREE.Material).dispose();
-          }
-        }
-        const positions = data.atoms.map(
-          (a) => new THREE.Vector3(...a.position),
-        );
-        const center = positions
-          .reduce((sum, p) => sum.add(p), new THREE.Vector3())
-          .divideScalar(positions.length);
-        positions.forEach((p) => p.sub(center));
-        const radius = Math.max(...positions.map((p) => p.length())) + 0.7;
-        group.userData.radius = radius;
-        const scale =
-          ((host.current?.clientWidth || 900) < 600 ? 4 : 6.5) / radius;
-        data.atoms.forEach((atom, index) => {
-          const material = new THREE.MeshPhysicalMaterial({
-            color: colors[atom.element] || "#aab5cc",
-            metalness: atom.element === "C" ? 0.9 : 0.45,
-            roughness: 0.16,
-            clearcoat: 1,
-            clearcoatRoughness: 0.08,
-            envMapIntensity: 1.4,
-          });
-          const sphere = new THREE.Mesh(
-            new THREE.SphereGeometry(
-              atom.element === "C" ? 0.66 : 0.71,
-              40,
-              32,
-            ),
-            material,
-          );
-          sphere.position.copy(positions[index]);
-          sphere.userData.element = atom.element;
-          group.add(sphere);
-        });
-        data.bonds.forEach((bond) => {
-          const start = positions[bond.start],
-            end = positions[bond.end];
-          const delta = new THREE.Vector3().subVectors(end, start);
-          const mesh = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.16, 0.16, delta.length(), 16),
-            new THREE.MeshPhysicalMaterial({
-              color: "#7b85a6",
-              metalness: 0.85,
-              roughness: 0.22,
-              clearcoat: 1,
-            }),
-          );
-          mesh.position.copy(start).add(end).multiplyScalar(0.5);
-          mesh.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 1, 0),
-            delta.normalize(),
-          );
-          group.add(mesh);
-        });
-        group.scale.setScalar(scale);
-        setAtomCount(data.atoms.length);
-        setUnavailable(false);
-        setLoading(false);
+        cache.set(smiles, data);
+        apply(data);
       })
       .catch((e) => {
-        if (e.name !== "AbortError") {
-          setUnavailable(true);
-          setLoading(false);
-        }
+        if (e.name === "AbortError") return;
+        onInfoRef.current?.(null);
+        setState((s) => (s === "no-webgl" ? s : "unavailable"));
       });
     return () => controller.abort();
   }, [smiles]);
+
+  const fallback = state === "no-webgl" || state === "unavailable";
   return (
-    <div className="scene-wrap">
+    <div className="scene" data-state={state}>
       <div
         ref={host}
         className="scene-canvas"
         role="img"
-        aria-label={`Interactive illustrative 3D model of ${smiles}. Drag to rotate.`}
+        aria-label={`Illustrative 3D model of ${smiles}. Drag to rotate.`}
+        hidden={fallback}
       />
-      {unavailable && (
+      {fallback && (
         <div className="scene-fallback">
-          <img
-            src={`/api/molecule/svg?smiles=${encodeURIComponent(smiles)}`}
-            alt={`Molecular structure of ${smiles}`}
-          />
+          {state === "no-webgl" ? (
+            <Molecule smiles={smiles} />
+          ) : (
+            <p>3D geometry could not be generated for this structure.</p>
+          )}
         </div>
       )}
-      <div className="scene-caption">
-        <span className="scene-cross">+</span>
-        <span>
-          {loading
-            ? "BUILDING SPECIMEN"
-            : unavailable
-              ? "MOLECULAR STRUCTURE"
-              : `${atomCount} ATOMS / DRAG TO ROTATE`}
-        </span>
-        <span className="scene-cross">+</span>
-      </div>
+      {state === "ready" && (
+        <button type="button" className="scene-reset" onClick={() => api.current?.reset()} aria-label="Reset 3D view">
+          <RotateCcw size={14} aria-hidden="true" />
+          <span>Reset view</span>
+        </button>
+      )}
     </div>
   );
 }

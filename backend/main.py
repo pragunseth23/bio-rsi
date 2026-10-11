@@ -255,6 +255,15 @@ async def verify(id: str):
     return result
 
 
+@app.post("/api/molecule/evaluate")
+async def evaluate_molecule(config: RunConfig):
+    """Score the seed exactly as POST /api/runs would, without starting a run."""
+    try:
+        return await asyncio.to_thread(chemistry.evaluate, config.smiles, config.model_dump())
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 @app.get("/api/molecule/svg")
 def molecule_svg(smiles: str = Query(max_length=500)):
     try:

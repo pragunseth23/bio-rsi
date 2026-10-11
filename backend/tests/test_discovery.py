@@ -120,6 +120,22 @@ def test_unavailable_blockchain_does_not_break_optimization(tmp_path, monkeypatc
         assert client.post(f"/api/verify/{exps[-1]['record']['id']}").json()["chain_valid"]
 
 
+def test_seed_evaluation_matches_run_initial(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "store", Store(tmp_path / "evaluate.sqlite"))
+    monkeypatch.setattr(main.blockchain, "configured", lambda: False)
+    monkeypatch.setenv("ITERATION_DELAY", "0")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    with TestClient(main.app) as client:
+        config = {"smiles": "Oc1ccccc1", "objective": "logp", "target_logp": 1.5, "iterations": 1}
+        preview = client.post("/api/molecule/evaluate", json=config)
+        assert preview.status_code == 200
+        run = client.post("/api/runs", json=config).json()
+        assert preview.json() == run["initial"]
+        invalid = client.post("/api/molecule/evaluate", json={"smiles": "C1CC"})
+        assert invalid.status_code == 422 and isinstance(invalid.json()["detail"], str)
+        assert client.post("/api/molecule/evaluate", json={"smiles": "CC.O"}).status_code == 422
+
+
 def test_illustrative_geometry_is_real_and_deterministic():
     geometry = chemistry.scene_data("CCO")
     assert [a["element"] for a in geometry["atoms"]] == ["C", "C", "O"]
