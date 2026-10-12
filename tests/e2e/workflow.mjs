@@ -353,15 +353,15 @@ expectErrors = true;
 await stopApi();
 api = spawn(`${ROOT}/.venv/bin/python`, ["-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000"], {
   cwd: ROOT,
-  env: { ...process.env, DATABASE_PATH: path.join(OUT, "chain.sqlite"), ITERATION_DELAY: "0.1", BASE_SEPOLIA_RPC_URL: "http://127.0.0.1:9", WALLET_PRIVATE_KEY: "0x" + "11".repeat(32), CONTRACT_ADDRESS: "0x" + "22".repeat(20) },
+  env: { ...process.env, DATABASE_PATH: path.join(OUT, "chain.sqlite"), ITERATION_DELAY: "0.1", CHAIN: "bsc-testnet", RPC_URL: "http://127.0.0.1:9", WALLET_PRIVATE_KEY: "0x" + "11".repeat(32), CONTRACT_ADDRESS: "0x" + "22".repeat(20) },
   stdio: ["ignore", fs.openSync(path.join(OUT, "api.log"), "a"), fs.openSync(path.join(OUT, "api.log"), "a")],
 });
 await waitApi(true);
 await p.goto("http://127.0.0.1:3000/"); await p.reload({ waitUntil: "networkidle" });
 await p.waitForTimeout(1500);
-await check("Chain mode shown when credentials are configured", async () => {
+await check("BNB Chain (BSC Testnet) mode shown when credentials are configured", async () => {
   const t = await p.locator(".mode-chip").innerText();
-  if (!/Base Sepolia/.test(t)) throw new Error(t);
+  if (!/BSC Testnet/.test(t)) throw new Error(t);
 });
 await p.getByRole("link", { name: "Enter the lab" }).click();
 await field("Iterations").fill("3");

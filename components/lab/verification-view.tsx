@@ -5,6 +5,7 @@ import { Molecule } from "./molecule";
 import { PropertyGrid } from "./property-grid";
 import { StatusBadge } from "./status";
 import { postJson } from "@/lib/api";
+import { byChainId, txUrl } from "@/lib/chains";
 import { fmt, pad, shortHash } from "@/lib/format";
 import type { Experiment, Verification } from "@/lib/types";
 
@@ -108,7 +109,7 @@ export function VerificationView({
     : !intact
       ? { tone: "bad", text: "Integrity check failed: this record or one of its ancestors no longer matches its hash." }
       : verification.onchain_matches === true
-        ? { tone: "ok", text: "Verified: the record matches its Base Sepolia commitment." }
+        ? { tone: "ok", text: `Verified: the record matches its ${byChainId(current?.proof.chain_id)?.name || "onchain"} commitment.` }
         : verification.onchain_matches === false
           ? { tone: "bad", text: "Mismatch: the local record is intact but differs from what was committed onchain." }
           : current?.proof.status === "local-only"
@@ -208,10 +209,12 @@ export function VerificationView({
               <div>
                 <dt>Network</dt>
                 <dd>
-                  {current.proof.contract_address ? "Base Sepolia · 84532" : "Local SHA-256 chain"}
+                  {current.proof.chain_id
+                    ? `${byChainId(current.proof.chain_id)?.name || "Chain"} · ${current.proof.chain_id}`
+                    : "Local SHA-256 chain"}
                   {current.proof.block_number ? ` · block ${current.proof.block_number}` : ""}
-                  {current.proof.transaction_hash && (
-                    <a href={`https://sepolia.basescan.org/tx/${current.proof.transaction_hash}`} target="_blank" rel="noreferrer">
+                  {current.proof.transaction_hash && txUrl(current.proof.chain_id, current.proof.transaction_hash) && (
+                    <a href={txUrl(current.proof.chain_id, current.proof.transaction_hash)} target="_blank" rel="noreferrer">
                       {shortHash(current.proof.transaction_hash)}
                       <ExternalLink size={12} aria-hidden="true" />
                     </a>

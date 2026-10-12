@@ -3,6 +3,7 @@ import { memo, useEffect, useRef } from "react";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { Molecule } from "./molecule";
 import { StatusBadge } from "./status";
+import { txUrl } from "@/lib/chains";
 import { fmt, pad, shortHash, signed } from "@/lib/format";
 import type { Experiment } from "@/lib/types";
 
@@ -93,10 +94,10 @@ export const ExperimentTable = memo(function ExperimentTable({
               </td>
               <td className="hide-sm">
                 <StatusBadge status={e.proof.status} />
-                {e.proof.transaction_hash && (
+                {e.proof.transaction_hash && txUrl(e.proof.chain_id, e.proof.transaction_hash) && (
                   <a
                     className="tx-link"
-                    href={`https://sepolia.basescan.org/tx/${e.proof.transaction_hash}`}
+                    href={txUrl(e.proof.chain_id, e.proof.transaction_hash)}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(ev) => ev.stopPropagation()}

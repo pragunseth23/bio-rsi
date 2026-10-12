@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse, JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from typing import Literal
-from . import chemistry, blockchain
+from . import chemistry, blockchain, chains
 from .agent import advise
 from .records import Store, digest, candidate_hash, canonical_json
 
@@ -55,7 +55,7 @@ def record_experiment(run, iteration, best, stats, parent, advice):
               "smiles": best["smiles"], "properties": best["properties"], "scores": best["scores"], "fitness": best["fitness"],
               "objective": config, "simulator": chemistry.VERSION, "timestamp": now(), "mutation": best.get("mutation", {"method": "seed"}),
               "candidate_hash": candidate_hash(best["smiles"]), "parent_hash": parent, "stats": stats, "agent": advice}
-    exp = {"record": record, "hash": digest(record), "proof": {"status": "pending" if run["chain_mode"] == "base-sepolia" else "local-only", "contract_address": run.get("contract_address"), "chain_id": 84532 if run["chain_mode"] == "base-sepolia" else None}}
+    exp = {"record": record, "hash": digest(record), "proof": {"status": "local-only" if run["chain_mode"] == "local-only" else "pending", "contract_address": run.get("contract_address"), "chain_id": None if run["chain_mode"] == "local-only" else chains.info(run["chain_mode"])["chain_id"]}}
     store.save_experiment(exp)
     if exp["proof"]["status"] == "pending":
         queue.put_nowait(record["id"])
@@ -144,7 +144,7 @@ app = FastAPI(title="Proof of Discovery", lifespan=lifespan)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "simulator": chemistry.VERSION, "chain_mode": "base-sepolia" if blockchain.configured() else "local-only", "agent": "llm" if os.getenv("LLM_API_KEY") else "heuristic"}
+    return {"status": "ok", "simulator": chemistry.VERSION, "chain_mode": chains.selected() if blockchain.configured() else "local-only", "network": chains.info(), "agent": "llm" if os.getenv("LLM_API_KEY") else "heuristic"}
 
 
 @app.get("/api/runs")
@@ -162,7 +162,7 @@ async def create_run(config: RunConfig):
         raise HTTPException(422, str(e))
     id = str(uuid.uuid4())
     run = {"id": id, "config": config.model_dump(), "initial": initial, "status": "running", "created_at": now(), "iteration": 0,
-           "best_fitness": initial["fitness"], "evaluated": 0, "attempted": 0, "chain_mode": "base-sepolia" if blockchain.configured() else "local-only", "contract_address": os.getenv("CONTRACT_ADDRESS") if blockchain.configured() else None}
+           "best_fitness": initial["fitness"], "evaluated": 0, "attempted": 0, "chain_mode": chains.selected() if blockchain.configured() else "local-only", "contract_address": os.getenv("CONTRACT_ADDRESS") if blockchain.configured() else None}
     store.save_run(run)
     tasks[id] = asyncio.create_task(optimize(id, initial))
     return run

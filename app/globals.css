@@ -2665,3 +2665,18 @@ li[data-state="fail"] .check-icon {
     width: 100%;
   }
 }
+
+.track-line {
+  max-width: 52ch;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--night-rule-strong);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--night-ink-2);
+}
+.track-line strong {
+  color: var(--night-ink);
+  font-weight: 600;
+}

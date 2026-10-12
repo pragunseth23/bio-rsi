@@ -234,6 +234,7 @@ export function LabApp() {
                     canLaunch={canLaunch}
                     simulator={lab.health?.simulator}
                     chainMode={lab.health?.chain_mode}
+                    networkName={lab.health?.network?.name}
                     onLaunch={launch}
                     onStop={lab.stop}
                   />
@@ -307,7 +308,10 @@ export function LabApp() {
         <span className="footer-brand">
           <BrandMark /> Proof of Discovery
         </span>
-        <p>A hackathon build. Computed properties are heuristics, not evidence of efficacy or safety.</p>
+        <p>
+          Built at B@B Hacks 2.0 · YZi Labs track · {lab.health?.network?.name || "BNB Smart Chain Testnet"}. Computed properties
+          are heuristics, not evidence of efficacy or safety.
+        </p>
         <span className="muted">{lab.health?.simulator || "RDKit"} · SHA-256</span>
       </footer>
       <CompareDialog open={compareOpen} onOpenChange={setCompareOpen} experiments={experiments} pair={pair} setPair={setPair} />

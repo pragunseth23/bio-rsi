@@ -99,7 +99,10 @@ export type Verification = {
 
 export type Health = {
   status: string;
+  /** Network key when commitments are configured, otherwise "local-only". */
   chain_mode: string;
+  /** The network commitments target (configured or not). */
+  network?: { key: string; name: string; chain_id: number; explorer: string };
   agent: string;
   simulator: string;
 };

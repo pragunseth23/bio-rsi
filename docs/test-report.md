@@ -53,7 +53,7 @@ All browser tests ran in headless Chromium (Playwright 1.64) against the **real*
 | 31 | Restoring the record → verifies again | ✅ |
 | 32 | Page loaded with API down → offline banner, Launch disabled | ✅ |
 | 33 | "Retry now" recovers without a reload | ✅ |
-| 34 | With chain credentials configured, header shows Base Sepolia mode | ✅ |
+| 34 | With chain credentials configured, header shows BSC Testnet mode | ✅ |
 | 35 | Unreachable RPC → every commitment ends *Failed*; "0 onchain" (never shown as committed) | ✅ |
 | 36 | Failed commitment reported separately from intact integrity | ✅ |
 | 37 | "Retry failed commitments" → backend accepts the re-queue (`status: queued`) | ✅ |
@@ -85,7 +85,7 @@ Targets: LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1. All met. What changed to ge
 | ≥ 500 candidates per run; seeded demo improves | ✅ 900 scored; 0.407 → 0.946, deterministic across processes |
 | Agent reviews strategy every 5 iterations; heuristic fallback without key | ✅ |
 | Hash-linked records, deterministic serialization | ✅ |
-| Base Sepolia commitments, tx hash, block, explorer link, statuses | ✅ implemented; **real testnet commit not exercised** (see limitations) |
+| Onchain commitments, tx hash, block, explorer link, statuses | ✅ BNB Smart Chain Testnet by default (YZi Labs track); full path verified on a local chain-97 node (see below) |
 | Dashboard: dark surface, molecule SVGs, live chart (best, average, valid %) | ✅ |
 | Timeline: iteration, structure, fitness, property changes, parent, status, tx hash | ✅ |
 | Compare any two molecules | ✅ |
@@ -94,13 +94,22 @@ Targets: LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1. All met. What changed to ge
 | Persistence across refresh | ✅ |
 | Invalid molecules / unavailable chain handled without crashing | ✅ |
 
+## BNB Chain (YZi Labs track) verification
+
+Run against a local EVM node configured as chain 97 (BSC Testnet's chain ID), using the repo's own scripts and API:
+
+| Step | Result |
+| --- | --- |
+| `CHAIN=bsc-testnet npm run contract:deploy` | contract deployed, explorer link on testnet.bscscan.com |
+| Ethanol / QED / 30 generations / seed 42 | 31 / 31 records `verified`, each proof `chain_id: 97` with block number and tx hash |
+| Verify experiment (generation 30) | `hash_matches`, `chain_valid`, `onchain_matches` all true |
+| Edit generation 30 in the database, verify | `onchain_matches: false`, status `failed` |
+| Restore, verify | verified again |
+| UI | header "BSC Testnet", BscScan links, "Verified: the record matches its BNB Smart Chain Testnet commitment." |
+
 ## Known limitations
 
-- **No real Base Sepolia transaction was made.** No funded testnet wallet or RPC is available, and this environment's network policy blocks most external hosts. What was tested:
-  - the failure path against an unreachable RPC (in the browser);
-  - the contract in an in-memory EVM (pytest).
-
-  A real commit needs `BASE_SEPOLIA_RPC_URL`, `WALLET_PRIVATE_KEY` and `CONTRACT_ADDRESS` (see README).
+- **Public BSC Testnet not reached from the build sandbox.** Its network policy blocks external RPCs, so the full commit path was verified on a local chain-97 node (above). A public-testnet run needs a wallet funded from the BNB Chain faucet; see the README.
 - **Browser coverage:** Chromium only. Safari and Firefox were not tested.
 - **Interrupted runs:** a run interrupted by a server restart cannot be resumed (backend design). The UI labels it *Interrupted* and lets you start a new run.
 - **3D geometry:** the 3D model is an illustrative ETKDG/MMFF conformer, labeled as such. Scores come from 2D descriptors.

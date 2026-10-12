@@ -1,6 +1,20 @@
 # Proof of Discovery
 
-An immersive molecular lab with an interactive Three.js sculpture, a live research console, and a local, integrated demo of recursive molecular optimization with real RDKit scoring, a live Next.js dashboard, persisted experiments and a cryptographic audit trail. Solidity + viem can commit the same records to **Base Sepolia** when a funded account is configured.
+**Built at B@B Hacks 2.0 for the YZi Labs track: Build for Programmable Capital, Intelligence & Science.**
+
+An AI agent runs an evolutionary search for better molecules. RDKit scores every candidate, and every generation the agent accepts becomes a hash-linked record committed to **BNB Chain (BSC Testnet)**. Anyone can recompute any record, walk its lineage back to the seed, and check it against the contract.
+
+## Why this fits the YZi Labs track
+
+| YZi Labs idea starter | What Proof of Discovery does |
+| --- | --- |
+| **Trusted agent infra**: identity, authorization, *tamper-evident logs for agents acting on tools* | The search agent's every accepted step (molecule, scores, mutation, strategy, simulator version) is a SHA-256 record whose parent is the previous record. Records are committed to a Solidity contract that enforces ordering, parent continuity and owner-only writes. **Verify experiment** recomputes the hash, walks the chain and reads the contract back. |
+| **AI × Bio**: lab data middleware, *provenance for biological data* | Each candidate molecule carries its provenance: parent, mutation method, agent strategy, RDKit version and timestamp. Editing any ancestor is detected. |
+| **Deploy on BSC Testnet or opBNB Testnet** | `CHAIN=bsc-testnet` is the default; `opbnb-testnet` is also supported. Explorer links go to testnet.bscscan.com / testnet.opbnbscan.com. |
+
+The bottleneck it addresses: AI is starting to run experiments on its own, and today there is no way to audit what it actually tried. Proof of Discovery makes every step checkable by a third party.
+
+How we verified the BNB path: we deployed the contract with `npm run contract:deploy` to a local EVM node configured as chain 97 (BSC Testnet's chain ID), ran Ethanol / QED / 30 generations / seed 42, and got **31 of 31 records committed and verified**. Verify experiment returned `onchain_matches: true`; tampering a committed record made it fail. For the public testnet, fund a wallet from the [BNB Chain faucet](https://www.bnbchain.org/en/testnet-faucet) and follow [BNB Chain commitments](#bnb-chain-commitments-yzi-labs-track) below.
 
 ## Run locally
 
@@ -42,28 +56,32 @@ Objectives:
 - `logp`: `−abs(calculated_logP − target_logP)`, optimal value 0.
 - `multi`: configurable weighted mean of QED, normalized proximity to MW 300, target logP, TPSA 75, and rule-based structural constraints. Individual scores are in the exported records and API. Normalization equations are in `backend/chemistry.py`.
 
-## Base Sepolia
+## BNB Chain commitments (YZi Labs track)
 
-Local-only mode is the default. It produces genuine SHA-256 hash-linked records and **never reports onchain success**. A transaction requires all three blockchain variables in `.env`:
+Local-only mode is the default. It produces genuine SHA-256 hash-linked records and **never reports onchain success**. Onchain commitments turn on when `.env` has a wallet key and a contract address:
 
 ```dotenv
-BASE_SEPOLIA_RPC_URL=https://your-base-sepolia-rpc
+CHAIN=bsc-testnet          # default (chain 97); also opbnb-testnet (5611) or base-sepolia (84532)
+RPC_URL=                   # optional; defaults to the network's public RPC
 WALLET_PRIVATE_KEY=0xYOUR_TESTNET_PRIVATE_KEY
 CONTRACT_ADDRESS=0xYOUR_DEPLOYED_CONTRACT
 ```
 
-Use a testnet-only wallet funded with Base Sepolia ETH. Set the RPC URL and private key first, then:
+1. Use a testnet-only wallet and get free testnet BNB from the [BNB Chain faucet](https://www.bnbchain.org/en/testnet-faucet).
+2. Set `WALLET_PRIVATE_KEY` (and `CHAIN`/`RPC_URL` if not using the defaults), then deploy:
 
-```bash
-npm run contract:compile
-npm run contract:deploy
-```
+   ```bash
+   npm run contract:compile
+   npm run contract:deploy
+   ```
 
-Copy the returned `contract_address` into `.env`, then restart both services. Deployment and commitments use **chain ID 84532**. The deployment wallet becomes the contract owner and must be the commitment signer. The contract enforces owner-only writes, unique record hashes, exact generation ordering starting at 0, and parent continuity within each run.
+3. Copy the returned `contract_address` into `CONTRACT_ADDRESS`, then restart both services. The header now shows **BSC Testnet**, every record shows its transaction on testnet.bscscan.com, and **Verify experiment** reads the contract back.
+
+The deployment wallet becomes the contract owner and must be the commitment signer. The contract enforces owner-only writes, unique record hashes, exact generation ordering starting at 0, and parent continuity within each run. Each proof stores its `chain_id`, so explorer links stay correct even if `CHAIN` changes later. `BASE_SEPOLIA_RPC_URL` from older configurations still works with `CHAIN=base-sepolia`.
 
 The contract emits `ExperimentCommitted(runId, iteration, recordHash, candidateHash, fitness, parentHash)`. `runId` is Keccak-256 of the UUID string. Candidate and record commitments use SHA-256. Fitness is signed and scaled by `10^8`.
 
-Simulation does not wait for transactions. A separate queue submits them sequentially and persists transaction hashes before waiting for receipts. A successful receipt produces the **Committed onchain** badge, block number and BaseScan link. **Verify experiment** additionally reads the stored contract tuple over RPC and compares every field. Only that read confirms the selected record matches contract state. One block confirmation is used for this testnet demo; it does not establish finality.
+Simulation does not wait for transactions. A separate queue submits them sequentially and persists transaction hashes before waiting for receipts. A successful receipt produces the **Committed onchain** badge, block number and an explorer link (BscScan for BSC Testnet). **Verify experiment** additionally reads the stored contract tuple over RPC and compares every field. Only that read confirms the selected record matches contract state. One block confirmation is used for this testnet demo; it does not establish finality.
 
 RPC or transaction errors become `failed`, preserve any submitted transaction hash, and do not crash the optimizer. Use **Retry failed commitments** in the verification view to reconcile failed transactions in generation order. Unconfirmed transactions are checked again before any resubmission. If the RPC remains inaccessible, verification reports unavailable. Pending commitments reload from SQLite on restart. Interrupted optimization runs remain inspectable; start a new run to optimize again.
 

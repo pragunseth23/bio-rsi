@@ -145,3 +145,38 @@ def test_illustrative_geometry_is_real_and_deterministic():
     assert geometry == chemistry.scene_data("CCO")
     with pytest.raises(ValueError):
         chemistry.scene_data("not-a-molecule")
+
+
+def test_chain_selection_defaults_to_bnb_testnet(tmp_path, monkeypatch):
+    from backend import chains
+    for key in ["CHAIN", "RPC_URL", "BASE_SEPOLIA_RPC_URL", "WALLET_PRIVATE_KEY", "CONTRACT_ADDRESS"]:
+        monkeypatch.delenv(key, raising=False)
+    assert chains.selected() == "bsc-testnet"
+    assert chains.info()["chain_id"] == 97 and chains.rpc_url().startswith("https://")
+    monkeypatch.setenv("CHAIN", "opbnb-testnet")
+    assert chains.info()["chain_id"] == 5611
+    monkeypatch.setenv("CHAIN", "base-sepolia")
+    monkeypatch.setenv("BASE_SEPOLIA_RPC_URL", "http://legacy")
+    assert chains.rpc_url() == "http://legacy"
+    monkeypatch.setenv("CHAIN", "nope")
+    with pytest.raises(ValueError):
+        chains.selected()
+    # A configured BNB run records chain 97 on every proof and reports it in /api/health.
+    monkeypatch.setenv("CHAIN", "bsc-testnet")
+    monkeypatch.setattr(main, "store", Store(tmp_path / "bnb.sqlite"))
+    monkeypatch.setattr(main.blockchain, "configured", lambda: True)
+    async def failing_bridge(action, exp):
+        raise RuntimeError("no RPC in tests")
+    monkeypatch.setattr(main.blockchain, "bridge", failing_bridge)
+    monkeypatch.setenv("ITERATION_DELAY", "0")
+    with TestClient(main.app) as client:
+        health = client.get("/api/health").json()
+        assert health["chain_mode"] == "bsc-testnet" and health["network"]["chain_id"] == 97
+        run = client.post("/api/runs", json={"iterations": 1}).json()
+        assert run["chain_mode"] == "bsc-testnet"
+        for _ in range(100):
+            exps = client.get(f"/api/runs/{run['id']}/experiments").json()
+            if len(exps) == 2:
+                break
+            time.sleep(.03)
+        assert all(e["proof"]["chain_id"] == 97 for e in exps)

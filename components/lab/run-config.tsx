@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import { AlertCircle, Check, ChevronDown, LoaderCircle, Play, ShieldCheck, Square } from "lucide-react";
 import type { SeedPreview } from "@/hooks/use-seed-preview";
+import { byKey } from "@/lib/chains";
 import { LIMITS, PRESETS, WEIGHT_KEYS, type FieldErrors } from "@/lib/config";
 import type { ConfigDraft, Objective } from "@/lib/types";
 
@@ -66,6 +67,7 @@ export function RunConfig({
   canLaunch,
   simulator,
   chainMode,
+  networkName,
   onLaunch,
   onStop,
 }: {
@@ -80,6 +82,7 @@ export function RunConfig({
   canLaunch: boolean;
   simulator?: string;
   chainMode?: string;
+  networkName?: string;
   onLaunch: () => void;
   onStop: () => void;
 }) {
@@ -296,9 +299,9 @@ export function RunConfig({
           )}
           <p className="config-note" id={`${uid}-launch-note`}>
             <ShieldCheck size={14} aria-hidden="true" />
-            {chainMode === "base-sepolia"
-              ? "Each generation is hash-linked and queued for Base Sepolia."
-              : "Each generation is hash-linked locally. No onchain transactions."}
+            {byKey(chainMode)
+              ? `Each generation is hash-linked and committed to ${byKey(chainMode)!.name}.`
+              : `Each generation is hash-linked locally. No onchain transactions until a ${networkName || "BNB Smart Chain Testnet"} wallet is configured.`}
           </p>
         </div>
       </form>

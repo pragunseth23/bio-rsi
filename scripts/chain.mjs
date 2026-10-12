@@ -11,7 +11,14 @@ import {
   isAddress,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
+import { baseSepolia, bscTestnet, opBNBTestnet } from "viem/chains";
+// CHAIN selects the network; BNB Smart Chain Testnet is the default (YZi Labs track).
+const NETWORKS = { "bsc-testnet": bscTestnet, "opbnb-testnet": opBNBTestnet, "base-sepolia": baseSepolia };
+const chainKey = (process.env.CHAIN || "bsc-testnet").trim().toLowerCase();
+const network = NETWORKS[chainKey];
+const rpcUrl =
+  process.env.RPC_URL || (chainKey === "base-sepolia" ? process.env.BASE_SEPOLIA_RPC_URL : undefined);
+const explorer = network?.blockExplorers?.default.url;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const action = process.argv[2];
 const source = fs.readFileSync(
@@ -37,15 +44,12 @@ function compile() {
   return output.contracts["ProofOfDiscovery.sol"].ProofOfDiscovery;
 }
 const artifact = compile();
-const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http(process.env.BASE_SEPOLIA_RPC_URL),
-});
+const publicClient = network && createPublicClient({ chain: network, transport: http(rpcUrl) });
 function wallet() {
   return createWalletClient({
     account: privateKeyToAccount(process.env.WALLET_PRIVATE_KEY),
-    chain: baseSepolia,
-    transport: http(process.env.BASE_SEPOLIA_RPC_URL),
+    chain: network,
+    transport: http(rpcUrl),
   });
 }
 async function main() {
@@ -57,8 +61,10 @@ async function main() {
     );
     return { compiled: true };
   }
-  if ((await publicClient.getChainId()) !== baseSepolia.id)
-    throw new Error("RPC must be Base Sepolia (84532)");
+  if (!network) throw new Error(`Unsupported CHAIN "${chainKey}". Use ${Object.keys(NETWORKS).join(", ")}.`);
+  if (action === "network") return { chain: chainKey, chain_id: network.id, name: network.name, rpc: rpcUrl || network.rpcUrls.default.http[0] };
+  if ((await publicClient.getChainId()) !== network.id)
+    throw new Error(`RPC must be ${network.name} (${network.id})`);
   if (action === "deploy") {
     const hash = await wallet().deployContract({
       abi: artifact.abi,
@@ -72,7 +78,8 @@ async function main() {
     return {
       contract_address: receipt.contractAddress,
       transaction_hash: hash,
-      explorer: `https://sepolia.basescan.org/tx/${hash}`,
+      chain_id: network.id,
+      explorer: `${explorer}/tx/${hash}`,
     };
   }
   let input = "";
@@ -140,17 +147,18 @@ async function main() {
       candidate === r.candidate_hash &&
       fitness === BigInt(Math.round(r.fitness * 1e8)) &&
       parent === r.parent_hash;
-    return { matches, chain_id: baseSepolia.id };
+    return { matches, chain_id: network.id };
   }
   throw new Error("Unknown action");
 }
 try {
   console.log(JSON.stringify(await main()));
-} catch {
+} catch (e) {
+  const detail = /^(Unsupported CHAIN|RPC must be)/.test(e?.message || "") ? ` ${e.message}` : "";
   console.log(
     JSON.stringify({
       error:
-        "Blockchain operation failed. Check RPC, contract ownership, account funding and transaction status.",
+        "Blockchain operation failed. Check RPC, contract ownership, account funding and transaction status." + detail,
     }),
   );
   process.exitCode = 1;

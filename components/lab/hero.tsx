@@ -84,6 +84,10 @@ export const Hero = memo(function Hero({
         <p className="hero-footnote">
           Scores are RDKit heuristics. They say nothing about whether a molecule works in a body, or is safe.
         </p>
+        <p className="track-line">
+          Built at B@B Hacks 2.0 for the <strong>YZi Labs track</strong>: tamper-evident logs for an AI agent doing
+          science, built to commit every generation to <strong>BNB Chain</strong> (BSC Testnet).
+        </p>
       </div>
 
       <div className="specimen">

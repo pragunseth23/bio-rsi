@@ -2,6 +2,7 @@
 import { ArrowRight } from "lucide-react";
 import type { Connection } from "@/hooks/use-lab";
 import type { Tab } from "@/hooks/use-hash-tab";
+import { byKey } from "@/lib/chains";
 
 export function BrandMark() {
   return (
@@ -64,8 +65,8 @@ export function SiteHeader({
             ? "Service offline"
             : connection === "connecting"
               ? "Connecting"
-              : chainMode === "base-sepolia"
-                ? "Base Sepolia"
+              : byKey(chainMode)
+                ? byKey(chainMode)!.short
                 : "Local hash chain"}
         </span>
         <a
